@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Danganronpa 1 Thai Mod Server</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="hero">
+    <p class="badge">Production Pipeline • Nintendo Switch • Danganronpa 1</p>
+    <h1>อัปโหลดไฟล์เกม .zip แล้วให้ AI Server สร้างม็อดภาษาไทย</h1>
+    <p class="subtitle">
+      เวอร์ชันนี้เชื่อมต่อเซิร์ฟเวอร์จริง: อัปโหลดไฟล์, สร้างงาน, ติดตามสถานะ,
+      และดาวน์โหลดไฟล์ม็อดที่ประมวลผลเสร็จแล้วได้ทันที
+    </p>
+  </header>
+
+  <main>
+    <section class="panel upload-panel">
+      <h2>1) Upload</h2>
+      <p>รองรับไฟล์ <strong>.zip</strong> จากเกม dump ที่คุณเตรียมไว้</p>
+
+      <label id="dropZone" class="drop-zone" for="fileInput">
+        <input id="fileInput" type="file" accept=".zip" />
+        <span class="drop-title">วางไฟล์ .zip ที่นี่ หรือคลิกเพื่อเลือกไฟล์</span>
+        <span class="drop-note">ไฟล์เดียวต่อ 1 งาน (1 job)</span>
+      </label>
+
+      <ul id="fileList" class="file-list"></ul>
+      <button id="startBtn" class="primary" disabled>เริ่มสร้างม็อดจริงบนเซิร์ฟเวอร์</button>
+    </section>
+
+    <section class="panel pipeline-panel">
+      <h2>2) Job Status</h2>
+      <div class="progress-wrap">
+        <div class="progress-bar"><div id="progress" class="progress"></div></div>
+        <p id="statusText">รออัปโหลดไฟล์</p>
+      </div>
+      <ul id="logList" class="log-list"></ul>
+    </section>
+
+    <section class="panel result-panel">
+      <h2>3) Download</h2>
+      <p id="resultText">เมื่อสถานะเป็น done ปุ่มดาวน์โหลดจะใช้งานได้</p>
+      <button id="downloadBtn" class="secondary" disabled>ดาวน์โหลด Thai Mod Pack</button>
+    </section>
+  </main>
+
+  <footer>
+    <p>รันเซิร์ฟเวอร์ด้วยคำสั่ง: <code>python server.py</code></p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

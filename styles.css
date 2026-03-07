@@ -1,0 +1,162 @@
+:root {
+  --bg: #0a0a14;
+  --text: #f7f7ff;
+  --muted: #bbb8d9;
+  --accent: #b66bff;
+  --accent2: #59e3d4;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Noto Sans Thai", "Segoe UI", Tahoma, sans-serif;
+  color: var(--text);
+  background: radial-gradient(circle at top, #1d1d42 0%, var(--bg) 60%);
+  min-height: 100vh;
+}
+
+.hero,
+main {
+  max-width: 980px;
+  margin: 0 auto;
+  padding-left: 1.2rem;
+  padding-right: 1.2rem;
+}
+
+.hero {
+  padding-top: 2.5rem;
+  padding-bottom: 1rem;
+}
+
+.badge {
+  display: inline-block;
+  background: rgba(182, 107, 255, 0.2);
+  border: 1px solid rgba(182, 107, 255, 0.6);
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.85rem;
+}
+
+h1 {
+  margin: 1rem 0;
+  font-size: clamp(1.6rem, 4vw, 2.7rem);
+}
+
+.subtitle {
+  color: var(--muted);
+  max-width: 760px;
+}
+
+main {
+  display: grid;
+  gap: 1rem;
+  padding-bottom: 2rem;
+}
+
+.panel {
+  background: linear-gradient(160deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.01));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 1.2rem;
+}
+
+.drop-zone {
+  border: 2px dashed rgba(89, 227, 212, 0.45);
+  border-radius: 12px;
+  padding: 2rem;
+  text-align: center;
+  display: block;
+  margin-top: 1rem;
+  cursor: pointer;
+}
+
+.drop-zone.dragging {
+  border-color: var(--accent2);
+  background: rgba(89, 227, 212, 0.08);
+}
+
+#fileInput {
+  display: none;
+}
+
+.drop-title {
+  display: block;
+  font-weight: 700;
+}
+
+.drop-note {
+  display: block;
+  color: var(--muted);
+  margin-top: 0.35rem;
+}
+
+.file-list,
+.log-list {
+  margin: 1rem 0;
+  padding-left: 1rem;
+  color: #dddaf6;
+}
+
+.log-list {
+  max-height: 160px;
+  overflow: auto;
+}
+
+button {
+  border: 0;
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.primary {
+  color: #fff;
+  background: linear-gradient(120deg, var(--accent), #8a5dff);
+}
+
+.secondary {
+  color: #08080d;
+  background: linear-gradient(120deg, var(--accent2), #7de8d4);
+}
+
+.progress-wrap {
+  margin-top: 0.8rem;
+}
+
+.progress-bar {
+  height: 12px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.progress {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent2), var(--accent));
+  transition: width 0.25s ease;
+}
+
+#statusText,
+#resultText,
+footer {
+  color: var(--muted);
+}
+
+footer {
+  text-align: center;
+  padding: 1rem;
+}
+
+code {
+  color: #fff;
+}
