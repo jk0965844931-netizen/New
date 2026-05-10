@@ -22,7 +22,9 @@ if ! command -v xcodebuild >/dev/null 2>&1; then
 fi
 
 xcodebuild -version
-xcodebuild -list -project "$IOS_DIR/LocalAudioPiPTranslator.xcodeproj"
+if ! xcodebuild -list -project "$IOS_DIR/LocalAudioPiPTranslator.xcodeproj"; then
+  echo "warning: xcodebuild -list failed; continuing to the build step so the full build log is captured." >&2
+fi
 
 set +e
 xcodebuild \
@@ -30,6 +32,7 @@ xcodebuild \
   -scheme LocalAudioPiPTranslator \
   -configuration Release \
   -sdk iphoneos \
+  -destination 'generic/platform=iOS' \
   -derivedDataPath "$DERIVED_DATA" \
   CODE_SIGNING_ALLOWED=NO \
   CODE_SIGNING_REQUIRED=NO \
