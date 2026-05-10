@@ -1,0 +1,13 @@
+{
+  "name": "manga-overlay-translator",
+  "version": "1.0.0",
+  "description": "Fast mobile-first manga overlay translator prototype with local/Ollama/Hugging Face provider hooks.",
+  "type": "module",
+  "scripts": {
+    "start": "python3 -m http.server 5173",
+    "build": "node --check src/main.js",
+    "preview": "python3 -m http.server 4173"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
