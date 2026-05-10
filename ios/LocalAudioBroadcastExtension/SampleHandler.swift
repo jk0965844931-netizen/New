@@ -11,6 +11,7 @@ final class SampleHandler: RPBroadcastSampleHandler {
     override func broadcastStarted(withSetupInfo setupInfo: [String: NSObject]?) {
         writer.write(
             sourceText: "Broadcast started",
+            translatedText: "เริ่มรับ Screen Recording จาก Broadcast Upload Extension แล้ว",
             translatedText: "เริ่มรับเสียง/หน้าจอจาก Broadcast Upload Extension แล้ว",
             sourceLanguage: "system",
             targetLanguage: "th"
@@ -48,10 +49,10 @@ final class SampleHandler: RPBroadcastSampleHandler {
         switch sampleBufferType {
         case .audioApp:
             audioAppSampleCount += 1
-            handleAudioSample(kind: "app audio", count: audioAppSampleCount)
+            handleScreenAudioSample(kind: "screen app audio", count: audioAppSampleCount)
         case .audioMic:
             audioMicSampleCount += 1
-            handleAudioSample(kind: "microphone", count: audioMicSampleCount)
+            handleOptionalMicrophoneSample(count: audioMicSampleCount)
         case .video:
             videoFrameCount += 1
             handleVideoFrame(count: videoFrameCount)
@@ -60,11 +61,21 @@ final class SampleHandler: RPBroadcastSampleHandler {
         }
     }
 
-    private func handleAudioSample(kind: String, count: Int) {
+    private func handleScreenAudioSample(kind: String, count: Int) {
         guard count == 1 || count.isMultiple(of: 180) else { return }
         writer.write(
-            sourceText: "Receiving \(kind) buffers #\(count)",
-            translatedText: "กำลังรับเสียง \(kind) ผ่าน ReplayKit #\(count)",
+            sourceText: "Screen recording includes \(kind) buffers #\(count)",
+            translatedText: "Screen Recording ส่งเสียงของแอปมาพร้อม broadcast #\(count)",
+            sourceLanguage: "system",
+            targetLanguage: "th"
+        )
+    }
+
+    private func handleOptionalMicrophoneSample(count: Int) {
+        guard count == 1 || count.isMultiple(of: 180) else { return }
+        writer.write(
+            sourceText: "Optional microphone track #\(count)",
+            translatedText: "พบไมค์เสริมจาก Broadcast picker แต่โหมดหลักคือ Screen Recording",
             sourceLanguage: "system",
             targetLanguage: "th"
         )

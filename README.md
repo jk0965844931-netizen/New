@@ -1,13 +1,13 @@
-# Local Audio PiP Translator
+# Screen Broadcast PiP Translator
 
-โปรเจกต์นี้เพิ่มต้นแบบ **iOS local realtime audio translator** สำหรับกรณี “ฟังเสียงเพลง/เกมแล้วแปลขึ้นหน้าจอแบบ PiP/floating overlay” พร้อม workflow บน GitHub Actions macOS เพื่อ build ไฟล์ `.ipa` แบบ unsigned
+โปรเจกต์นี้เพิ่มต้นแบบ **iOS local realtime screen-broadcast subtitle translator** สำหรับกรณี “เปิด Screen Recording/Broadcast แล้วแปลเสียง/ซับจากหน้าจอเป็น PiP subtitle” พร้อม workflow บน GitHub Actions macOS เพื่อ build ไฟล์ `.ipa` แบบ unsigned
 
-> หมายเหตุสำคัญ: iOS ไม่อนุญาตให้แอปทั่วไปดักฟังเสียง system audio ของแอปอื่นแบบเงียบ ๆ โดยตรง การทำให้ถูกต้องต้องใช้ไมโครโฟน, audio session ที่ผู้ใช้อนุญาต, หรือ ReplayKit Broadcast Extension ที่ผู้ใช้เริ่มเอง ส่วน PiP จริงของ iOS ต้องอิง video layer; ในต้นแบบนี้จึงทำ floating overlay ในแอป, เพิ่ม voice translation ด้วย Text-to-Speech, และวางโครงต่อยอดไป Broadcast Extension/AVPictureInPictureController ภายหลัง
+> หมายเหตุสำคัญ: โหมดหลักของแอปนี้คือ Screen Recording/Broadcast ไม่ใช่การอัดเสียงล้วน ๆ เพราะ iOS ไม่อนุญาตให้แอปทั่วไปดัก system audio เองแบบเงียบ ๆ วิธีที่ถูกต้องคือให้ผู้ใช้เริ่ม ReplayKit Broadcast ผ่าน UI ของ iOS แล้วระบบส่งเฟรมหน้าจอและเสียงของแอปที่ broadcast ให้ extension ส่วน PiP จริงต้องอิง video layer; ต้นแบบนี้จึง render ซับเป็น sample-buffer video แล้วเปิด System PiP ที่ลากขยับได้
 
 ## มีอะไรใน repo นี้
 
 - `ios/LocalAudioPiPTranslator.xcodeproj` — Xcode project สำหรับ iOS app
-- `ios/LocalAudioPiPTranslator` — SwiftUI app ที่มี UI สำหรับเริ่ม/หยุดการฟังเสียง, แสดง transcript, แปล local dictionary, floating overlay, ReplayKit picker และ PiP subtitle controller
+- `ios/LocalAudioPiPTranslator` — SwiftUI app ที่มี UI สำหรับเริ่ม Screen Broadcast/import ซับ, แสดง transcript, แปล local dictionary, floating subtitle, ReplayKit picker และ PiP subtitle controller
 - `ios/LocalAudioBroadcastExtension` — Broadcast Upload Extension scaffold สำหรับรับ `audioApp`, `audioMic` และ `video` sample buffers จาก Screen Recording ที่ผู้ใช้กดเริ่มเอง
 - `ios/Shared` — โครง shared App Group payload สำหรับส่งซับ/คำแปลล่าสุดจาก extension กลับเข้าแอปหลัก
 - `ios/Scripts/build_unsigned_ipa.sh` — script สร้าง unsigned `.ipa` จาก command line บน macOS/Xcode
@@ -16,16 +16,16 @@
 
 ## ความสามารถของ iOS app ต้นแบบ
 
-- SwiftUI interface สำหรับ “Local Audio PiP Translator”
-- ขอสิทธิ์ Microphone และ Speech Recognition ครบก่อนเริ่มฟัง
+- SwiftUI interface สำหรับ “Screen Broadcast PiP Translator”
+- โหมดหลักเป็น Screen Recording/Broadcast ผ่าน ReplayKit; Microphone เป็น fallback เท่านั้น
 - ใช้ `SFSpeechRecognizer` พร้อม `requiresOnDeviceRecognition = true` เพื่อบังคับแนวทาง local-first เท่าที่อุปกรณ์รองรับ
 - เลือกภาษาต้นทาง/ปลายทางได้ เช่น Auto, English, Japanese, Korean, Chinese, Thai
 - แปลข้อความด้วย dictionary ในเครื่องก่อน และ fallback เป็นข้อความ `[Language] ...` เพื่อไม่ออก network
 - แปลเสียงได้จริงในต้นแบบ: เมื่อมีประโยคใหม่ แอปใช้ `AVSpeechSynthesizer` อ่านคำแปลออกเสียงตามภาษาปลายทาง
-- Floating subtitle แบบ PiP-style ภายในแอป พร้อมปรับขนาดตัวอักษร สีพื้นหลัง และเปิด/ปิดเสียงแปล
+- Floating subtitle ภายในแอป และ System PiP จริงที่ iOS ให้ผู้ใช้ลาก/ขยับได้เหมือน YouTube PiP
 - Conversation history สำหรับดูประโยคต้นฉบับ/คำแปลย้อนหลัง
-- ปุ่ม `Demo voice` สำหรับจำลองประโยคเกม/เพลงในเครื่อง
-- โหมดเลือก `ReplayKit / Screen Recording` พร้อม `RPSystemBroadcastPickerView` เพื่อให้ผู้ใช้เริ่ม Broadcast ผ่าน UI ทางการของ iOS
+- ปุ่ม `Demo subtitle` สำหรับจำลองซับเกม/วิดีโอในเครื่อง
+- โหมดเริ่มต้นคือ `Screen Recording` พร้อม `RPSystemBroadcastPickerView` เพื่อให้ผู้ใช้เริ่ม Broadcast ผ่าน UI ทางการของ iOS
 - Broadcast Upload Extension target ที่รับ `audioApp`, `audioMic`, `video` sample buffers แล้วเขียน subtitle payload ผ่าน App Group
 - PiP subtitle renderer scaffold ที่ render ข้อความแปลลงใน sample-buffer video stream สำหรับ `AVPictureInPictureController`
 
@@ -34,11 +34,11 @@
 
 ต้นแบบนี้เน้น flow ที่ผู้ใช้คาดหวังจากแอป live subtitle/voice translator:
 
-1. ฟังเสียงแบบ realtime จากไมค์หรือ pipeline ที่ผู้ใช้อนุญาต
-2. ถอดเสียงเป็น live transcript
+1. ผู้ใช้กดเริ่ม Screen Recording/Broadcast ผ่าน ReplayKit picker
+2. Broadcast Upload Extension รับเฟรมหน้าจอและ app audio ที่มากับ screen broadcast
 3. แปลในเครื่องแบบเร็วที่สุดเท่าที่ทำได้
 4. ส่งผลลัพธ์จาก extension กลับแอปหลักผ่าน App Group
-5. แสดงผลเป็น floating subtitle ภายในแอป และเตรียม render เป็น video stream สำหรับ PiP
+5. แสดงผลเป็น floating subtitle ภายในแอป และ render เป็น video stream สำหรับ System PiP ที่ผู้ใช้ลากขยับได้
 6. อ่านคำแปลออกเสียงด้วย voice ของภาษาปลายทาง
 7. เก็บ history สั้น ๆ เพื่อย้อนดูบทสนทนา
 
@@ -49,6 +49,17 @@
 
 ### 1) รับเสียง/หน้าจอข้ามแอปด้วย Broadcast Upload Extension
 
+แอปหลักเพิ่ม `RPSystemBroadcastPickerView` เพื่อเปิด Screen Recording/Broadcast picker ของ iOS แทนการอัดเสียงเอง ผู้ใช้ต้องกดเริ่ม Screen Broadcast ด้วยตัวเอง จากนั้น `LocalAudioBroadcastExtension/SampleHandler.swift` จะได้รับ sample buffers ตามที่ระบบอนุญาต:
+
+- `.audioApp` สำหรับเสียงจากแอป/หน้าจอที่ถูก broadcast
+- `.audioMic` สำหรับไมโครโฟนเสริมถ้าผู้ใช้เปิดเอง แต่ picker ในแอปตั้งค่าเริ่มต้นให้ปิดปุ่มไมค์เพื่อเน้น Screen Recording
+- `.video` สำหรับเฟรมหน้าจอ
+
+ตอนนี้ extension scaffold เขียน payload จำลอง/สถานะล่าสุดลง App Group เพื่อให้แอปหลัก poll กลับมาแสดงผลได้ จุดต่อจริงถัดไปคือส่ง app-audio buffers ที่มากับ screen broadcast เข้า ASR/translation engine ที่อยู่ใน extension หรือ service ที่ผู้ใช้ยินยอม
+
+### 2) ทำซับลอยด้วย Picture-in-Picture
+
+แอปหลักเพิ่ม `PiPSubtitleController` เพื่อ render ข้อความคำแปลเป็นภาพใน `AVSampleBufferDisplayLayer`, attach layer เข้ากับ preview view ในแอป แล้วเปิด `AVPictureInPictureController.ContentSource` แบบ sample-buffer video layer เมื่อ PiP เริ่มแล้ว iOS เป็นเจ้าของหน้าต่าง PiP ผู้ใช้จึงลาก/ขยับ/ย่อ/ขยายได้เหมือน YouTube PiP ไม่ใช่การสร้าง overlay เหนือแอปอื่นแบบ Android
 แอปหลักเพิ่ม `RPSystemBroadcastPickerView` เพื่อเปิด broadcast picker ของ iOS แทนการแอบดักเสียงเอง ผู้ใช้ต้องกดเริ่ม Screen Broadcast ด้วยตัวเอง จากนั้น `LocalAudioBroadcastExtension/SampleHandler.swift` จะได้รับ sample buffers ตามที่ระบบอนุญาต:
 
 - `.audioApp` สำหรับเสียงจากแอป/หน้าจอที่ถูก broadcast
@@ -109,7 +120,7 @@ script จะรัน `xcodebuild` ด้วย:
 
 - iOS ไม่มี permission ให้แอปทั่วไปวาด overlay เหนือแอปอื่นเหมือน Android
 - PiP จริงต้องผูกกับ video playback/call UI ที่เป็นไปตาม API ของ Apple
-- repo นี้เพิ่ม `PiPSubtitleController` ที่ render caption เป็น sample-buffer video layer สำหรับ PiP แล้ว จุดถัดไปคือทดสอบบนอุปกรณ์จริงและปรับ lifecycle/ขนาดหน้าต่าง
+- repo นี้เพิ่ม `PiPSubtitleController` ที่ attach sample-buffer video layer เข้ากับ preview view และเปิด System PiP จริง เมื่อรันบนอุปกรณ์ที่รองรับ ผู้ใช้จะลาก/ขยับหน้าต่างได้แบบ YouTube PiP
 
 ### Local translation model
 

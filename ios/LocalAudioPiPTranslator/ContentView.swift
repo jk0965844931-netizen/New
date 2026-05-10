@@ -34,16 +34,16 @@ struct ContentView: View {
 
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Local Audio PiP Translator")
+            Text("Screen Broadcast PiP Translator")
                 .font(.largeTitle.bold())
-            Text("แนว ViiTor-style: live subtitle, voice translation, floating caption และ pipeline สำหรับต่อ ReplayKit โดยเน้น local-first")
+            Text("แนว ViiTor-style: เริ่มจาก Screen Recording/Broadcast ของ iOS แล้วแสดงซับใน System PiP ที่ผู้ใช้ลากขยับได้แบบ YouTube")
                 .foregroundStyle(.secondary)
         }
     }
 
     private var controls: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Picker("Capture mode", selection: $audioSession.captureMode) {
+            Picker("Input source", selection: $audioSession.captureMode) {
                 ForEach(LocalAudioSessionController.CaptureMode.allCases) { mode in
                     Text(mode.rawValue).tag(mode)
                 }
@@ -89,7 +89,7 @@ struct ContentView: View {
                 }
                 .buttonStyle(.bordered)
 
-                Button("Demo voice") {
+                Button("Demo subtitle") {
                     audioSession.simulateGameLine()
                 }
                 .buttonStyle(.bordered)
@@ -129,10 +129,10 @@ struct ContentView: View {
 
     private var viitorPipelineCard: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Label("ViiTor-style iOS pipeline", systemImage: "pip.enter")
+            Label("Screen Recording + movable System PiP", systemImage: "pip.enter")
                 .font(.headline)
 
-            Text("1) ผู้ใช้เริ่ม Screen Broadcast ผ่านปุ่มของ iOS  2) Broadcast Upload Extension รับ audio/video sample buffers  3) แอปอ่านคำแปลผ่าน App Group  4) PiP renderer ทำซับเป็นวิดีโอเล็กที่ iOS อนุญาตให้ลอยข้ามแอป")
+            Text("1) ผู้ใช้เริ่ม Screen Recording/Broadcast ผ่านปุ่มของ iOS  2) Broadcast Upload Extension รับเฟรมหน้าจอและ app audio ที่มากับ broadcast  3) แอปอ่านซับผ่าน App Group  4) เปิด System PiP จริงที่ iOS ให้ผู้ใช้ลาก/ขยับได้เหมือน YouTube PiP")
                 .font(.callout)
                 .foregroundStyle(.secondary)
 
@@ -142,9 +142,9 @@ struct ContentView: View {
                     .background(Color.white.opacity(0.16), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
 
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Start iOS Broadcast")
+                    Text("Start Screen Broadcast")
                         .font(.subheadline.bold())
-                    Text("กดเพื่อเปิด picker อย่างเป็นทางการของ ReplayKit")
+                    Text("กดเพื่อเปิด Screen Recording picker ทางการของ ReplayKit")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -152,7 +152,7 @@ struct ContentView: View {
             }
 
             HStack {
-                Button("Import broadcast subtitles") {
+                Button("Import screen subtitles") {
                     audioSession.startBroadcastImport()
                 }
                 .buttonStyle(.borderedProminent)
@@ -169,7 +169,7 @@ struct ContentView: View {
             }
 
             HStack {
-                Button("Start PiP subtitles") {
+                Button("Start movable PiP") {
                     pipSubtitleController.updateSubtitle(audioSession.translatedText)
                     pipSubtitleController.startPictureInPicture()
                 }
@@ -187,6 +187,17 @@ struct ContentView: View {
             Text(pipSubtitleController.statusMessage)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            Text(pipSubtitleController.systemPiPDescription)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            PiPSubtitlePreviewView(controller: pipSubtitleController)
+                .frame(height: 76)
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .stroke(Color.white.opacity(0.18))
+                )
         }
         .padding()
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -196,7 +207,7 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 8) {
             Label("ทำให้ใกล้ ViiTor โดยไม่ฝืนข้อจำกัด iOS", systemImage: "checkmark.shield.fill")
                 .font(.headline)
-            Text("ตัวแอปรองรับการแปลเสียงจากไมค์แบบ local และมีโครง ReplayKit สำหรับเสียงจากวิดีโอ/เกมที่ผู้ใช้เริ่ม screen broadcast เอง ส่วน iOS ไม่ให้แอปทั่วไปดัก system audio หรือวาด overlay เหนือแอปอื่นโดยตรง จึงใช้ floating subtitle ภายในแอปและเตรียมทางต่อ PiP/video layer ในขั้นถัดไป")
+            Text("โหมดหลักคือ Screen Recording/Broadcast: ผู้ใช้กดเริ่มเองผ่าน ReplayKit แล้วระบบส่งเฟรมหน้าจอพร้อมเสียงของแอปที่ broadcast มาให้ extension ส่วนซับลอยใช้ System Picture-in-Picture จริง ไม่ใช่ overlay เถื่อน จึงลาก/ขยับได้ตามกฎ iOS เหมือน YouTube PiP")
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }
@@ -237,7 +248,7 @@ struct ContentView: View {
             }
 
             if audioSession.history.isEmpty {
-                Text("ยังไม่มีประโยคที่แปล กด Demo voice หรือ Start เพื่อเริ่ม")
+                Text("ยังไม่มีซับที่แปล กด Demo subtitle หรือเริ่ม Screen Broadcast")
                     .foregroundStyle(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
             } else {

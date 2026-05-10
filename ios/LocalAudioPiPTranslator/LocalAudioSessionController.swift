@@ -5,8 +5,8 @@ import Speech
 @MainActor
 final class LocalAudioSessionController: ObservableObject {
     enum CaptureMode: String, CaseIterable, Identifiable {
-        case microphone = "Microphone"
-        case replayKit = "ReplayKit / Screen Recording"
+        case replayKit = "Screen Recording"
+        case microphone = "Microphone fallback"
 
         var id: String { rawValue }
     }
@@ -51,7 +51,7 @@ final class LocalAudioSessionController: ObservableObject {
         .init(id: "zh", title: "Chinese", speechCode: "zh-Hans", voiceCode: "zh-CN")
     ]
 
-    @Published var captureMode: CaptureMode = .microphone
+    @Published var captureMode: CaptureMode = .replayKit
     @Published var engineState: EngineState = .idle
     @Published var sourceLanguageId = "auto"
     @Published var targetLanguageId = "th"
@@ -119,8 +119,17 @@ final class LocalAudioSessionController: ObservableObject {
 
     func start() async {
         stop()
+
+        if captureMode == .replayKit {
+            engineState = .running
+            partialTranscript = "Press Start Screen Broadcast, then import subtitles from the ReplayKit shared container."
+            translatedText = "รอซับจาก Screen Recording/Broadcast…"
+            startBroadcastImport()
+            return
+        }
+
         engineState = .requestingPermission
-        partialTranscript = "Requesting local speech and microphone permission…"
+        partialTranscript = "Requesting local speech and microphone permission for fallback mode…"
 
         let speechStatus = await requestSpeechAuthorization()
         guard speechStatus == .authorized else {
@@ -144,7 +153,7 @@ final class LocalAudioSessionController: ObservableObject {
             engineState = .running
             partialTranscript = captureMode == .microphone
                 ? "Listening to microphone locally on device…"
-                : "ReplayKit mode selected: add a Broadcast Upload Extension to feed app/game audio buffers into this same translator pipeline."
+                : "Screen Recording mode selected: use the Broadcast picker so ReplayKit can feed screen frames and app audio into the extension."
             translatedText = "กำลังรอฟังเสียง…"
         } catch {
             engineState = .blocked
@@ -193,6 +202,7 @@ final class LocalAudioSessionController: ObservableObject {
 
     func startBroadcastImport() {
         broadcastImportTimer?.invalidate()
+        broadcastStatus = "Polling App Group subtitles from Screen Recording Broadcast Extension…"
         broadcastStatus = "Polling App Group subtitles from Broadcast Upload Extension…"
         broadcastImportTimer = Timer.scheduledTimer(withTimeInterval: 0.8, repeats: true) { [weak self] _ in
             Task { @MainActor in
@@ -218,7 +228,7 @@ final class LocalAudioSessionController: ObservableObject {
         let url = container.appendingPathComponent(AppGroupConfig.latestSubtitleFileName)
         guard let data = try? Data(contentsOf: url),
               let payload = try? JSONDecoder().decode(BroadcastSubtitlePayload.self, from: data) else {
-            broadcastStatus = "Waiting for Broadcast Upload Extension samples…"
+            broadcastStatus = "Waiting for Screen Recording broadcast samples…"
             return
         }
 

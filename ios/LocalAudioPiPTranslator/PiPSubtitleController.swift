@@ -1,6 +1,7 @@
 import AVFoundation
 import AVKit
 import CoreMedia
+import SwiftUI
 import UIKit
 
 @MainActor
@@ -9,7 +10,7 @@ final class PiPSubtitleController: NSObject, ObservableObject {
     @Published private(set) var isPictureInPictureActive = false
     @Published private(set) var statusMessage = "PiP subtitle renderer is ready."
 
-    private let displayLayer = AVSampleBufferDisplayLayer()
+    fileprivate let displayLayer = AVSampleBufferDisplayLayer()
     private var pictureInPictureController: AVPictureInPictureController?
     private var currentSubtitle = "คำแปลจะแสดงในหน้าต่าง PiP"
 
@@ -23,6 +24,19 @@ final class PiPSubtitleController: NSObject, ObservableObject {
     func updateSubtitle(_ text: String) {
         currentSubtitle = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? currentSubtitle : text
         renderSubtitleFrame(currentSubtitle)
+    }
+
+    var systemPiPDescription: String {
+        "This uses AVPictureInPictureController, so once PiP starts iOS owns the floating window and the user can drag it around like YouTube PiP."
+    }
+
+    func attachDisplayLayer(to view: UIView) {
+        if displayLayer.superlayer !== view.layer {
+            displayLayer.removeFromSuperlayer()
+            view.layer.addSublayer(displayLayer)
+        }
+        displayLayer.frame = view.bounds
+        isPictureInPicturePossible = pictureInPictureController?.isPictureInPicturePossible ?? false
     }
 
     func startPictureInPicture() {
@@ -107,7 +121,7 @@ extension PiPSubtitleController: AVPictureInPictureControllerDelegate {
     nonisolated func pictureInPictureControllerWillStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
         Task { @MainActor in
             isPictureInPictureActive = true
-            statusMessage = "PiP subtitles are starting."
+            statusMessage = "System PiP subtitles are starting. Drag the PiP window like YouTube PiP."
         }
     }
 
@@ -193,5 +207,39 @@ private extension UIImage {
             sampleBufferOut: &sampleBuffer
         )
         return sampleBuffer
+    }
+}
+
+struct PiPSubtitlePreviewView: UIViewRepresentable {
+    @ObservedObject var controller: PiPSubtitleController
+
+    func makeUIView(context: Context) -> PiPSubtitleContainerView {
+        let view = PiPSubtitleContainerView()
+        view.backgroundColor = .clear
+        view.attach(controller.displayLayer)
+        return view
+    }
+
+    func updateUIView(_ uiView: PiPSubtitleContainerView, context: Context) {
+        uiView.attach(controller.displayLayer)
+        controller.attachDisplayLayer(to: uiView)
+    }
+}
+
+final class PiPSubtitleContainerView: UIView {
+    private weak var hostedLayer: AVSampleBufferDisplayLayer?
+
+    func attach(_ layer: AVSampleBufferDisplayLayer) {
+        hostedLayer = layer
+        if layer.superlayer !== self.layer {
+            layer.removeFromSuperlayer()
+            self.layer.addSublayer(layer)
+        }
+        setNeedsLayout()
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        hostedLayer?.frame = bounds
     }
 }

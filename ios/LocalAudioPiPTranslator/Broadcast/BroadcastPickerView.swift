@@ -7,12 +7,12 @@ struct BroadcastPickerView: UIViewRepresentable {
     func makeUIView(context: Context) -> RPSystemBroadcastPickerView {
         let picker = RPSystemBroadcastPickerView(frame: .zero)
         picker.preferredExtension = preferredExtensionBundleIdentifier
-        picker.showsMicrophoneButton = true
+        picker.showsMicrophoneButton = false
         return picker
     }
 
     func updateUIView(_ uiView: RPSystemBroadcastPickerView, context: Context) {
         uiView.preferredExtension = preferredExtensionBundleIdentifier
-        uiView.showsMicrophoneButton = true
+        uiView.showsMicrophoneButton = false
     }
 }
