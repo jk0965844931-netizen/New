@@ -25,7 +25,16 @@ jobs:
       - name: Build unsigned IPA
         run: ./ios/Scripts/build_unsigned_ipa.sh
 
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: LocalAudioPiPTranslator-build-logs
+          path: ios/build/*.log
+          if-no-files-found: ignore
+
       - name: Upload unsigned IPA artifact
+        if: success()
         uses: actions/upload-artifact@v6
         with:
           name: LocalAudioPiPTranslator-unsigned-ipa

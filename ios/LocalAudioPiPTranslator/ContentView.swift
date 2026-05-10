@@ -328,7 +328,9 @@ struct AppGradient: View {
     }
 }
 
+#if DEBUG
 #Preview {
     ContentView()
         .environmentObject(LocalAudioSessionController())
 }
+#endif
