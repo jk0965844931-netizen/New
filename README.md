@@ -1,65 +1,106 @@
-# Manga Overlay Translator
+# Local Audio PiP Translator
 
-เว็บต้นแบบสำหรับอ่านมังงะพร้อมคำแปลแบบ overlay ที่ออกแบบให้เร็วและใช้งานบน iPhone ได้ โดยเน้น **local-first** ก่อน แล้วเปิดจุดต่อสำหรับ Ollama local, Ollama Cloud และ Hugging Face cloud
+โปรเจกต์นี้เพิ่มต้นแบบ **iOS local realtime audio translator** สำหรับกรณี “ฟังเสียงเพลง/เกมแล้วแปลขึ้นหน้าจอแบบ PiP/floating overlay” พร้อม workflow บน GitHub Actions macOS เพื่อ build ไฟล์ `.ipa` แบบ unsigned
 
-## ฟีเจอร์
+> หมายเหตุสำคัญ: iOS ไม่อนุญาตให้แอปทั่วไปดักฟังเสียง system audio ของแอปอื่นแบบเงียบ ๆ โดยตรง การทำให้ถูกต้องต้องใช้ไมโครโฟน, audio session ที่ผู้ใช้อนุญาต, หรือ ReplayKit Broadcast Extension ที่ผู้ใช้เริ่มเอง ส่วน PiP จริงของ iOS ต้องอิง video layer; ในต้นแบบนี้จึงทำ floating overlay ในแอป, เพิ่ม voice translation ด้วย Text-to-Speech, และวางโครงต่อยอดไป Broadcast Extension/AVPictureInPictureController ภายหลัง
 
-- **Search mode**: ค้นหาเว็บมังงะหรือเว็บทั่วไปผ่าน DuckDuckGo/Google/Bing/Brave และรองรับ SearXNG JSON endpoint ถ้ามี instance ที่เปิด CORS
-- **Reader mode**: วาง URL รูปภาพหลายบรรทัด แล้วแสดงเป็นหน้าอ่านมังงะ
-- **HTML image extractor**: วาง HTML/source ที่คัดลอกจากเว็บ แล้วให้แอปแยก `<img>`, `srcset`, `data-src` และ URL รูปภาพออกมาให้
-- **Web-in-web mode**: ฝังเว็บจริงผ่าน iframe เมื่อเว็บต้นทางอนุญาต
-- **Overlay editor**: แตะพื้นที่ว่างบนภาพเพื่อวางกรอบคำพูด, แตะกรอบเพื่อแก้ข้อความและตำแหน่งแบบเปอร์เซ็นต์
-- **Auto translate + cache**: แปลทันทีหลังแก้ข้อความในกรอบ และ cache ผลแปลระหว่าง session เพื่อลด latency
-- **Translation providers**:
-  - `local`: dictionary/cache เร็วสุด ไม่ออกเน็ต และเหมาะกับ iPhone มากที่สุด
-  - `ollama`: เรียก Ollama ที่เครื่องผู้ใช้ เช่น `gemma3:4b` หรือ `gemma4:e4b` ถ้าติดตั้งไว้
-  - `ollama-cloud`: เรียก Ollama Cloud ผ่าน `https://ollama.com/api/generate` พร้อม API key ที่เก็บเฉพาะ session
-  - `huggingface`: เรียก Hugging Face Inference API โดย token เก็บเฉพาะ session storage
-- **Mobile-first CSS** รองรับ safe-area, ปุ่มขนาดเหมาะกับ touch และ PWA service worker
+## มีอะไรใน repo นี้
 
-## ใช้ Gemma 4 / Ollama Cloud ได้ไหม?
+- `ios/LocalAudioPiPTranslator.xcodeproj` — Xcode project สำหรับ iOS app
+- `ios/LocalAudioPiPTranslator` — SwiftUI app ที่มี UI สำหรับเริ่ม/หยุดการฟังเสียง, แสดง transcript, แปล local dictionary, และ floating overlay
+- `ios/Scripts/build_unsigned_ipa.sh` — script สร้าง unsigned `.ipa` จาก command line บน macOS/Xcode
+- `.github/workflows/ios-unsigned-ipa.yml` — GitHub Actions workflow ใช้ runner macOS build แล้วอัปโหลด unsigned IPA artifact
+- เว็บเดโมเดิมยังอยู่ที่ `index.html`, `src/main.js`, `src/styles.css` และยังตรวจ syntax ได้ด้วย `npm run build`
 
-ได้ในเชิงสถาปัตยกรรม ถ้าบัญชี/เครื่องของคุณมี model นั้นให้เรียกใช้งาน:
+## ความสามารถของ iOS app ต้นแบบ
 
-1. ถ้าใช้ **Ollama local** ให้ติดตั้งหรือ pull model ในเครื่องที่รัน Ollama แล้วตั้ง endpoint เป็น `http://localhost:11434/api/generate` หรือ IP เครื่องในวง Wi‑Fi เช่น `http://192.168.1.20:11434/api/generate`
-2. ถ้าใช้ **Ollama Cloud** ให้เลือก provider `Ollama Cloud`, ใส่ API key และใส่ชื่อ model cloud ที่บัญชีคุณรองรับ เช่นช่องนี้ตั้งค่าเริ่มต้นเป็น `gemma4:e4b`
-3. บน iPhone โดยตรง การรัน LLM ใหญ่ใน browser ยังไม่เหมาะกับความเร็ว/แบตเตอรี่ จึงแนะนำให้ใช้ local dictionary/cache หรือเรียก cloud ผ่าน HTTPS
+- SwiftUI interface สำหรับ “Local Audio PiP Translator”
+- ขอสิทธิ์ Microphone และ Speech Recognition ครบก่อนเริ่มฟัง
+- ใช้ `SFSpeechRecognizer` พร้อม `requiresOnDeviceRecognition = true` เพื่อบังคับแนวทาง local-first เท่าที่อุปกรณ์รองรับ
+- เลือกภาษาต้นทาง/ปลายทางได้ เช่น Auto, English, Japanese, Korean, Chinese, Thai
+- แปลข้อความด้วย dictionary ในเครื่องก่อน และ fallback เป็นข้อความ `[Language] ...` เพื่อไม่ออก network
+- แปลเสียงได้จริงในต้นแบบ: เมื่อมีประโยคใหม่ แอปใช้ `AVSpeechSynthesizer` อ่านคำแปลออกเสียงตามภาษาปลายทาง
+- Floating subtitle แบบ PiP-style ภายในแอป พร้อมปรับขนาดตัวอักษร สีพื้นหลัง และเปิด/ปิดเสียงแปล
+- Conversation history สำหรับดูประโยคต้นฉบับ/คำแปลย้อนหลัง
+- ปุ่ม `Demo voice` สำหรับจำลองประโยคเกม/เพลงในเครื่อง
+- โหมดเลือก `ReplayKit / Screen Recording` เพื่อสื่อสาร pipeline ที่ถูกต้องสำหรับการรับเสียงจากเกม/แอปอื่นในอนาคต
 
-## วิธีใช้งานแบบเร็ว
 
-### ค้นหาเว็บมังงะหรือเว็บทั่วไป
+## แนวทางเทียบกับแอปแนว ViiTor
 
-1. เปิดแท็บ **ค้นหาเว็บ**
-2. พิมพ์ชื่อเรื่อง/คำค้น แล้วเลือกประเภท `มังงะ`, `เว็บทั่วไป` หรือ `ค้นหารูปภาพ`
-3. กด **เปิดผลค้นหา** เพื่อเปิดผลใน search engine ที่เลือก
-4. ถ้ามี SearXNG instance ที่เปิด CORS ให้ใส่ endpoint แล้วกด **ค้นหาในแอป** เพื่อดึงผลมาแสดงในเว็บนี้
-5. เมื่อเจอเว็บที่ต้องการ ให้เปิดในแท็บใหม่, ส่ง URL ไปยังโหมด **เว็บซ้อนเว็บ**, หรือคัดลอก URL/HTML กลับมาใช้ใน **โหลดรูป**
+ต้นแบบนี้เน้น flow ที่ผู้ใช้คาดหวังจากแอป live subtitle/voice translator:
 
-### อ่านและแปล overlay
+1. ฟังเสียงแบบ realtime จากไมค์หรือ pipeline ที่ผู้ใช้อนุญาต
+2. ถอดเสียงเป็น live transcript
+3. แปลในเครื่องแบบเร็วที่สุดเท่าที่ทำได้
+4. แสดงผลเป็น floating subtitle
+5. อ่านคำแปลออกเสียงด้วย voice ของภาษาปลายทาง
+6. เก็บ history สั้น ๆ เพื่อย้อนดูบทสนทนา
 
-1. เปิดเว็บ แล้วอยู่ในแท็บ **โหลดรูป**
-2. วาง URL รูปภาพหนึ่งรายการต่อหนึ่งบรรทัด หรือเปิดส่วน **ดึง URL รูปจาก HTML ที่คัดลอกมา** แล้ววาง HTML/source
-3. กดโหลดรูปเข้า reader
-4. แตะพื้นที่บนรูปเพื่อวางกรอบคำพูด
-5. แตะกรอบเพื่อพิมพ์ข้อความต้นฉบับ และปล่อยช่องคำแปลว่างหากต้องการให้ระบบแปลให้
-6. กด **แปล overlay ทั้งหมด** ถ้าต้องการแปลทุกกรอบพร้อมกัน
+ส่วนการทำให้ซับลอยเหนือแอปอื่นหรือฟังเสียงเกม/เพลงโดยตรง ต้องทำผ่าน API ที่ Apple อนุญาต เช่น ReplayKit Broadcast Extension หรือ PiP video layer ไม่ใช่การ bypass sandbox
 
-## ทำเป็นเว็บไซต์จริง
+## Build unsigned IPA บน GitHub
 
-โปรเจกต์นี้เป็น static website จึง deploy ฟรีได้บน GitHub Pages, Netlify หรือ Vercel โดยใช้โฟลเดอร์ root เป็น publish directory ดูขั้นตอนละเอียดใน [`DEPLOY.md`](./DEPLOY.md) วิธีสั้นที่สุดคือ push repo ขึ้น GitHub แล้วเปิด GitHub Pages ที่ Settings → Pages หรือใช้ Netlify/Vercel โดยตั้ง Build command เป็น `npm run build` และ Publish/Output directory เป็น `.`
+1. Push repo ขึ้น GitHub
+2. เข้าแท็บ **Actions**
+3. เลือก workflow **Build unsigned iOS IPA**
+4. กด **Run workflow** หรือ push ไฟล์ใน `ios/**`
+5. ดาวน์โหลด artifact ชื่อ `LocalAudioPiPTranslator-unsigned-ipa`
 
-## ข้อจำกัดสำคัญ
+ไฟล์ที่ได้คือ:
 
-- การค้นหาในตัวแอปแบบดึงผลกลับมาต้องใช้ SearXNG หรือ search backend ที่เปิด CORS เอง เพราะ search engine ส่วนใหญ่ไม่อนุญาตให้ static browser app scrape ผลโดยตรง
-- เว็บมังงะหลายเว็บไม่ยอมให้ฝัง iframe ด้วย `X-Frame-Options` หรือ `Content-Security-Policy` เว็บนี้จะไม่พยายาม bypass ระบบนั้น
-- รูปภาพจากเว็บอื่นอาจโดน hotlink/CORS block ให้ใช้รูปที่คุณมีสิทธิ์ใช้งาน หรือทำ proxy ฝั่ง server ที่คุณควบคุมเอง
-- OCR เต็มรูปแบบยังไม่รวมใน static app นี้ เพราะ browser ล้วน ๆ จะใหญ่และช้าบนมือถือ หากต้องการ OCR จริงให้ต่อ backend OCR/vision model หรือใช้ model vision ผ่าน provider ที่รองรับ
-- การใช้งานเว็บมังงะจริงควรเคารพลิขสิทธิ์, เงื่อนไขเว็บต้นทาง, robots policy, paywall และ rate limit
-- Token cloud ที่กรอกใน browser เหมาะกับ prototype เท่านั้น ถ้าทำ production ควรทำ backend proxy เพื่อซ่อน secret
+```text
+ios/build/LocalAudioPiPTranslator-unsigned.ipa
+```
 
-## คำสั่ง
+## Build unsigned IPA บน Mac local
+
+ต้องมี Xcode ติดตั้งไว้ก่อน แล้วรัน:
 
 ```bash
-npm run start
+./ios/Scripts/build_unsigned_ipa.sh
+```
+
+script จะรัน `xcodebuild` ด้วย:
+
+- `CODE_SIGNING_ALLOWED=NO`
+- `CODE_SIGNING_REQUIRED=NO`
+- `CODE_SIGN_IDENTITY=""`
+
+จากนั้น package โฟลเดอร์ `Payload/LocalAudioPiPTranslator.app` เป็น `.ipa`
+
+## ข้อจำกัดและทางต่อยอดให้เป็นแอปเต็ม
+
+### เสียงจากเพลง/เกมอื่น
+
+- **ทำไม่ได้โดยตรงจาก sandbox ของ iOS app ปกติ**
+- ทางที่ถูกต้องคือเพิ่ม **ReplayKit Broadcast Upload Extension** แล้วให้ผู้ใช้เริ่ม screen broadcast เอง
+- ใน extension ให้รับ audio sample buffer, ส่งเข้า on-device ASR/translator, แล้ว sync ผลลัพธ์กลับ app group/shared container
+
+### PiP / overlay เหนือแอปอื่น
+
+- iOS ไม่มี permission ให้แอปทั่วไปวาด overlay เหนือแอปอื่นเหมือน Android
+- PiP จริงต้องผูกกับ video playback/call UI ที่เป็นไปตาม API ของ Apple
+- สำหรับการใช้งานจริงควรทำเป็น PiP video layer ที่ render caption หรือใช้ Broadcast/SharePlay workflow ตามข้อจำกัดของระบบ
+
+### Local translation model
+
+ต้นแบบนี้ใช้ dictionary ในเครื่องเพื่อความเบาและไม่มี network ถ้าจะทำจริงให้ต่อ:
+
+- Apple Speech on-device สำหรับ ASR ภาษาที่รองรับ
+- Core ML / MLX model สำหรับ translation บนอุปกรณ์
+- quantized model ขนาดเล็กเพื่อ latency ต่ำและประหยัดแบต
+
+## เว็บเดโมเดิม
+
+รันเว็บ static demo:
+
+```bash
+npm start
+```
+
+ตรวจ syntax JavaScript:
+
+```bash
 npm run build
 ```
