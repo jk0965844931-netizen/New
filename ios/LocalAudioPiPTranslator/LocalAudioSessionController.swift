@@ -19,32 +19,106 @@ final class LocalAudioSessionController: ObservableObject {
         case blocked = "Permission or iOS limitation"
     }
 
+    struct LanguageOption: Identifiable, Hashable {
+        let id: String
+        let title: String
+        let speechCode: String?
+        let voiceCode: String
+    }
+
+    struct TranslationEntry: Identifiable, Equatable {
+        let id = UUID()
+        let source: String
+        let translated: String
+        let mode: CaptureMode
+        let timestamp: Date
+    }
+
+    static let sourceLanguages: [LanguageOption] = [
+        .init(id: "auto", title: "Auto", speechCode: nil, voiceCode: "en-US"),
+        .init(id: "en", title: "English", speechCode: "en-US", voiceCode: "en-US"),
+        .init(id: "ja", title: "Japanese", speechCode: "ja-JP", voiceCode: "ja-JP"),
+        .init(id: "ko", title: "Korean", speechCode: "ko-KR", voiceCode: "ko-KR"),
+        .init(id: "zh", title: "Chinese", speechCode: "zh-Hans", voiceCode: "zh-CN"),
+        .init(id: "th", title: "Thai", speechCode: "th-TH", voiceCode: "th-TH")
+    ]
+
+    static let targetLanguages: [LanguageOption] = [
+        .init(id: "th", title: "Thai", speechCode: "th-TH", voiceCode: "th-TH"),
+        .init(id: "en", title: "English", speechCode: "en-US", voiceCode: "en-US"),
+        .init(id: "ja", title: "Japanese", speechCode: "ja-JP", voiceCode: "ja-JP"),
+        .init(id: "ko", title: "Korean", speechCode: "ko-KR", voiceCode: "ko-KR"),
+        .init(id: "zh", title: "Chinese", speechCode: "zh-Hans", voiceCode: "zh-CN")
+    ]
+
     @Published var captureMode: CaptureMode = .microphone
     @Published var engineState: EngineState = .idle
-    @Published var sourceLanguage = "Auto"
-    @Published var targetLanguage = "Thai"
-    @Published var partialTranscript = "Press Start to request local speech permission."
+    @Published var sourceLanguageId = "auto"
+    @Published var targetLanguageId = "th"
+    @Published var partialTranscript = "Press Start to request local speech and microphone permission."
     @Published var translatedText = "คำแปลจะแสดงตรงนี้แบบ floating / PiP-style"
     @Published var isOverlayVisible = true
+    @Published var shouldSpeakTranslation = true
+    @Published var subtitleFontSize = 20.0
+    @Published var subtitleBackground = "Dark"
     @Published var latencyMillis = 0
+    @Published private(set) var history: [TranslationEntry] = []
 
     private let audioEngine = AVAudioEngine()
+    private let synthesizer = AVSpeechSynthesizer()
+    private var speechRecognizer: SFSpeechRecognizer?
     private var recognitionTask: SFSpeechRecognitionTask?
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
-    private let recognizer = SFSpeechRecognizer()
-    private let localDictionary: [String: String] = [
-        "hello": "สวัสดี",
-        "thank you": "ขอบคุณ",
-        "sorry": "ขอโทษ",
-        "go go go": "ไป ไป ไป",
-        "enemy spotted": "เจอศัตรูแล้ว",
-        "the song is ending": "เพลงกำลังจะจบ",
-        "i love you": "ฉันรักเธอ"
+    private var lastCommittedTranscript = ""
+
+    private let localDictionary: [String: [String: String]] = [
+        "th": [
+            "hello": "สวัสดี",
+            "thank you": "ขอบคุณ",
+            "sorry": "ขอโทษ",
+            "go go go": "ไป ไป ไป",
+            "enemy spotted": "เจอศัตรูแล้ว",
+            "the song is ending": "เพลงกำลังจะจบ",
+            "i love you": "ฉันรักเธอ",
+            "watch foreign videos with live subtitles": "ดูวิดีโอต่างภาษาพร้อมซับสด",
+            "speak and get instant translation": "พูดแล้วรับคำแปลทันที"
+        ],
+        "en": [
+            "สวัสดี": "Hello",
+            "ขอบคุณ": "Thank you",
+            "ขอโทษ": "Sorry",
+            "เจอศัตรูแล้ว": "Enemy spotted",
+            "ไป ไป ไป": "Go go go"
+        ],
+        "ja": [
+            "hello": "こんにちは",
+            "thank you": "ありがとうございます",
+            "enemy spotted": "敵を発見"
+        ],
+        "ko": [
+            "hello": "안녕하세요",
+            "thank you": "감사합니다",
+            "enemy spotted": "적 발견"
+        ],
+        "zh": [
+            "hello": "你好",
+            "thank you": "谢谢",
+            "enemy spotted": "发现敌人"
+        ]
     ]
+
+    var selectedSourceLanguage: LanguageOption {
+        Self.sourceLanguages.first { $0.id == sourceLanguageId } ?? Self.sourceLanguages[0]
+    }
+
+    var selectedTargetLanguage: LanguageOption {
+        Self.targetLanguages.first { $0.id == targetLanguageId } ?? Self.targetLanguages[0]
+    }
 
     func start() async {
         stop()
         engineState = .requestingPermission
+        partialTranscript = "Requesting local speech and microphone permission…"
 
         let speechStatus = await requestSpeechAuthorization()
         guard speechStatus == .authorized else {
@@ -54,13 +128,21 @@ final class LocalAudioSessionController: ObservableObject {
             return
         }
 
+        let microphoneAllowed = await requestMicrophoneAuthorization()
+        guard microphoneAllowed else {
+            engineState = .blocked
+            partialTranscript = "Microphone permission was denied."
+            translatedText = "เปิดสิทธิ์ Microphone ใน Settings ก่อนใช้งาน"
+            return
+        }
+
         do {
             try configureAudioSession()
             try startMicrophoneRecognition()
             engineState = .running
             partialTranscript = captureMode == .microphone
                 ? "Listening to microphone locally on device…"
-                : "ReplayKit capture requires a Broadcast Upload Extension; this app includes the UI and build pipeline scaffold."
+                : "ReplayKit mode selected: add a Broadcast Upload Extension to feed app/game audio buffers into this same translator pipeline."
             translatedText = "กำลังรอฟังเสียง…"
         } catch {
             engineState = .blocked
@@ -74,6 +156,7 @@ final class LocalAudioSessionController: ObservableObject {
         recognitionTask = nil
         recognitionRequest?.endAudio()
         recognitionRequest = nil
+        synthesizer.stopSpeaking(at: .immediate)
 
         if audioEngine.isRunning {
             audioEngine.inputNode.removeTap(onBus: 0)
@@ -91,23 +174,30 @@ final class LocalAudioSessionController: ObservableObject {
             "Go go go",
             "Hello",
             "The song is ending",
-            "Thank you"
+            "Thank you",
+            "Watch foreign videos with live subtitles",
+            "Speak and get instant translation"
         ]
-        let line = samples.randomElement() ?? "Hello"
-        partialTranscript = line
-        translatedText = translateLocally(line)
-        latencyMillis = Int.random(in: 80...240)
+        commitTranscript(samples.randomElement() ?? "Hello", isFinal: true)
         engineState = .running
+        latencyMillis = Int.random(in: 80...220)
+    }
+
+    func clearHistory() {
+        history.removeAll()
+        lastCommittedTranscript = ""
     }
 
     private func configureAudioSession() throws {
         let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.playAndRecord, mode: .measurement, options: [.duckOthers, .defaultToSpeaker])
+        try session.setCategory(.playAndRecord, mode: .measurement, options: [.duckOthers, .defaultToSpeaker, .allowBluetooth])
         try session.setActive(true, options: .notifyOthersOnDeactivation)
     }
 
     private func startMicrophoneRecognition() throws {
-        guard let recognizer, recognizer.isAvailable else {
+        let locale = selectedSourceLanguage.speechCode.map(Locale.init(identifier:)) ?? Locale.current
+        speechRecognizer = SFSpeechRecognizer(locale: locale)
+        guard let recognizer = speechRecognizer, recognizer.isAvailable else {
             throw LocalAudioError.recognizerUnavailable
         }
 
@@ -131,9 +221,8 @@ final class LocalAudioSessionController: ObservableObject {
                 guard let self else { return }
                 if let result {
                     let text = result.bestTranscription.formattedString
-                    self.partialTranscript = text
-                    self.translatedText = self.translateLocally(text)
-                    self.latencyMillis = max(1, Int(Date().timeIntervalSince(startedAt) * 1000).isMultiple(of: 1000) ? 100 : Int.random(in: 90...260))
+                    self.latencyMillis = max(1, Int(Date().timeIntervalSince(startedAt) * 1000) % 1000)
+                    self.commitTranscript(text, isFinal: result.isFinal)
                 }
                 if let error {
                     self.engineState = .blocked
@@ -141,6 +230,36 @@ final class LocalAudioSessionController: ObservableObject {
                 }
             }
         }
+    }
+
+    private func commitTranscript(_ text: String, isFinal: Bool) {
+        let cleaned = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !cleaned.isEmpty else { return }
+
+        let translated = translateLocally(cleaned)
+        partialTranscript = cleaned
+        translatedText = translated
+
+        if isFinal || shouldCommitPartial(cleaned) {
+            guard cleaned != lastCommittedTranscript else { return }
+            lastCommittedTranscript = cleaned
+            history.insert(.init(source: cleaned, translated: translated, mode: captureMode, timestamp: Date()), at: 0)
+            history = Array(history.prefix(20))
+            speakIfNeeded(translated)
+        }
+    }
+
+    private func shouldCommitPartial(_ text: String) -> Bool {
+        text.count >= 16 && abs(text.count - lastCommittedTranscript.count) >= 8
+    }
+
+    private func speakIfNeeded(_ translated: String) {
+        guard shouldSpeakTranslation else { return }
+        synthesizer.stopSpeaking(at: .immediate)
+        let utterance = AVSpeechUtterance(string: translated)
+        utterance.voice = AVSpeechSynthesisVoice(language: selectedTargetLanguage.voiceCode)
+        utterance.rate = AVSpeechUtteranceDefaultSpeechRate * 0.92
+        synthesizer.speak(utterance)
     }
 
     private func requestSpeechAuthorization() async -> SFSpeechRecognizerAuthorizationStatus {
@@ -151,11 +270,18 @@ final class LocalAudioSessionController: ObservableObject {
         }
     }
 
+    private func requestMicrophoneAuthorization() async -> Bool {
+        await withCheckedContinuation { continuation in
+            AVAudioSession.sharedInstance().requestRecordPermission { allowed in
+                continuation.resume(returning: allowed)
+            }
+        }
+    }
+
     private func translateLocally(_ text: String) -> String {
         let normalized = text.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        if let translated = localDictionary[normalized] { return translated }
-        if normalized.isEmpty { return "กำลังรอฟังเสียง…" }
-        return "[\(targetLanguage)] \(text)"
+        if let translated = localDictionary[targetLanguageId]?[normalized] { return translated }
+        return "[\(selectedTargetLanguage.title)] \(text)"
     }
 }
 
@@ -165,7 +291,7 @@ enum LocalAudioError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .recognizerUnavailable:
-            return "On-device speech recognizer is not available on this device/language."
+            return "On-device speech recognizer is not available for the selected source language on this device."
         }
     }
 }

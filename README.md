@@ -2,7 +2,7 @@
 
 โปรเจกต์นี้เพิ่มต้นแบบ **iOS local realtime audio translator** สำหรับกรณี “ฟังเสียงเพลง/เกมแล้วแปลขึ้นหน้าจอแบบ PiP/floating overlay” พร้อม workflow บน GitHub Actions macOS เพื่อ build ไฟล์ `.ipa` แบบ unsigned
 
-> หมายเหตุสำคัญ: iOS ไม่อนุญาตให้แอปทั่วไปดักฟังเสียง system audio ของแอปอื่นแบบเงียบ ๆ โดยตรง การทำให้ถูกต้องต้องใช้ไมโครโฟน, audio session ที่ผู้ใช้อนุญาต, หรือ ReplayKit Broadcast Extension ที่ผู้ใช้เริ่มเอง ส่วน PiP จริงของ iOS ต้องอิง video layer; ในต้นแบบนี้จึงทำ floating overlay ในแอปและวางโครงต่อยอดไป Broadcast Extension/AVPictureInPictureController ภายหลัง
+> หมายเหตุสำคัญ: iOS ไม่อนุญาตให้แอปทั่วไปดักฟังเสียง system audio ของแอปอื่นแบบเงียบ ๆ โดยตรง การทำให้ถูกต้องต้องใช้ไมโครโฟน, audio session ที่ผู้ใช้อนุญาต, หรือ ReplayKit Broadcast Extension ที่ผู้ใช้เริ่มเอง ส่วน PiP จริงของ iOS ต้องอิง video layer; ในต้นแบบนี้จึงทำ floating overlay ในแอป, เพิ่ม voice translation ด้วย Text-to-Speech, และวางโครงต่อยอดไป Broadcast Extension/AVPictureInPictureController ภายหลัง
 
 ## มีอะไรใน repo นี้
 
@@ -15,12 +15,29 @@
 ## ความสามารถของ iOS app ต้นแบบ
 
 - SwiftUI interface สำหรับ “Local Audio PiP Translator”
-- ขอสิทธิ์ Microphone และ Speech Recognition
+- ขอสิทธิ์ Microphone และ Speech Recognition ครบก่อนเริ่มฟัง
 - ใช้ `SFSpeechRecognizer` พร้อม `requiresOnDeviceRecognition = true` เพื่อบังคับแนวทาง local-first เท่าที่อุปกรณ์รองรับ
-- แปลข้อความด้วย dictionary ในเครื่องก่อน และ fallback เป็นข้อความ `[Thai] ...` เพื่อไม่ออก network
-- Floating overlay แบบ PiP-style ภายในแอป
-- ปุ่ม `Demo line` สำหรับจำลองประโยคเกม/เพลงในเครื่อง
+- เลือกภาษาต้นทาง/ปลายทางได้ เช่น Auto, English, Japanese, Korean, Chinese, Thai
+- แปลข้อความด้วย dictionary ในเครื่องก่อน และ fallback เป็นข้อความ `[Language] ...` เพื่อไม่ออก network
+- แปลเสียงได้จริงในต้นแบบ: เมื่อมีประโยคใหม่ แอปใช้ `AVSpeechSynthesizer` อ่านคำแปลออกเสียงตามภาษาปลายทาง
+- Floating subtitle แบบ PiP-style ภายในแอป พร้อมปรับขนาดตัวอักษร สีพื้นหลัง และเปิด/ปิดเสียงแปล
+- Conversation history สำหรับดูประโยคต้นฉบับ/คำแปลย้อนหลัง
+- ปุ่ม `Demo voice` สำหรับจำลองประโยคเกม/เพลงในเครื่อง
 - โหมดเลือก `ReplayKit / Screen Recording` เพื่อสื่อสาร pipeline ที่ถูกต้องสำหรับการรับเสียงจากเกม/แอปอื่นในอนาคต
+
+
+## แนวทางเทียบกับแอปแนว ViiTor
+
+ต้นแบบนี้เน้น flow ที่ผู้ใช้คาดหวังจากแอป live subtitle/voice translator:
+
+1. ฟังเสียงแบบ realtime จากไมค์หรือ pipeline ที่ผู้ใช้อนุญาต
+2. ถอดเสียงเป็น live transcript
+3. แปลในเครื่องแบบเร็วที่สุดเท่าที่ทำได้
+4. แสดงผลเป็น floating subtitle
+5. อ่านคำแปลออกเสียงด้วย voice ของภาษาปลายทาง
+6. เก็บ history สั้น ๆ เพื่อย้อนดูบทสนทนา
+
+ส่วนการทำให้ซับลอยเหนือแอปอื่นหรือฟังเสียงเกม/เพลงโดยตรง ต้องทำผ่าน API ที่ Apple อนุญาต เช่น ReplayKit Broadcast Extension หรือ PiP video layer ไม่ใช่การ bypass sandbox
 
 ## Build unsigned IPA บน GitHub
 

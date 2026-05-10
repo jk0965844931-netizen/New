@@ -9,9 +9,11 @@ struct ContentView: View {
                 VStack(alignment: .leading, spacing: 18) {
                     header
                     controls
+                    subtitleStyleCard
                     limitationCard
                     transcriptCard
-                    Spacer(minLength: 120)
+                    historyCard
+                    Spacer(minLength: 140)
                 }
                 .padding(20)
             }
@@ -29,7 +31,7 @@ struct ContentView: View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Local Audio PiP Translator")
                 .font(.largeTitle.bold())
-            Text("ฟังเสียงจากไมค์หรือ pipeline แบบ ReplayKit, ถอดเสียงและแปลในเครื่อง แล้วแสดงผลแบบ floating PiP-style")
+            Text("แนว ViiTor-style: live subtitle, voice translation, floating caption และ pipeline สำหรับต่อ ReplayKit โดยเน้น local-first")
                 .foregroundStyle(.secondary)
         }
     }
@@ -42,6 +44,20 @@ struct ContentView: View {
                 }
             }
             .pickerStyle(.segmented)
+
+            HStack(spacing: 12) {
+                Picker("From", selection: $audioSession.sourceLanguageId) {
+                    ForEach(LocalAudioSessionController.sourceLanguages) { language in
+                        Text(language.title).tag(language.id)
+                    }
+                }
+                Picker("To", selection: $audioSession.targetLanguageId) {
+                    ForEach(LocalAudioSessionController.targetLanguages) { language in
+                        Text(language.title).tag(language.id)
+                    }
+                }
+            }
+            .pickerStyle(.menu)
 
             HStack {
                 VStack(alignment: .leading) {
@@ -68,13 +84,39 @@ struct ContentView: View {
                 }
                 .buttonStyle(.bordered)
 
-                Button("Demo line") {
+                Button("Demo voice") {
                     audioSession.simulateGameLine()
                 }
                 .buttonStyle(.bordered)
             }
 
-            Toggle("Show PiP-style overlay", isOn: $audioSession.isOverlayVisible)
+            Toggle("Show floating subtitles", isOn: $audioSession.isOverlayVisible)
+            Toggle("Speak translated voice", isOn: $audioSession.shouldSpeakTranslation)
+        }
+        .padding()
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
+
+    private var subtitleStyleCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label("Subtitle style", systemImage: "captions.bubble.fill")
+                .font(.headline)
+            Slider(value: $audioSession.subtitleFontSize, in: 14...34, step: 1) {
+                Text("Font size")
+            } minimumValueLabel: {
+                Text("A")
+            } maximumValueLabel: {
+                Text("A+")
+            }
+            Picker("Background", selection: $audioSession.subtitleBackground) {
+                Text("Dark").tag("Dark")
+                Text("Purple").tag("Purple")
+                Text("Clear").tag("Clear")
+            }
+            .pickerStyle(.segmented)
+            Text("ปรับซับลอยแบบที่แอปแปลสดนิยมมี: ขนาดตัวอักษร, สีพื้นหลัง, และเปิด/ปิดเสียงแปล")
+                .font(.caption)
+                .foregroundStyle(.secondary)
         }
         .padding()
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
@@ -82,9 +124,9 @@ struct ContentView: View {
 
     private var limitationCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Label("ข้อจำกัด iOS ที่ต้องออกแบบให้ถูกต้อง", systemImage: "exclamationmark.triangle.fill")
+            Label("ทำให้ใกล้ ViiTor โดยไม่ฝืนข้อจำกัด iOS", systemImage: "checkmark.shield.fill")
                 .font(.headline)
-            Text("iOS ไม่อนุญาตให้แอปทั่วไปดักฟัง system audio จากเพลง/เกมอื่นโดยตรงแบบเงียบ ๆ ต้องใช้ไมค์, SharePlay/Audio Session ที่ได้รับอนุญาต, หรือ ReplayKit Broadcast Extension ที่ผู้ใช้เริ่มเอง ส่วน PiP ของ iOS ต้องผูกกับ video layer; ตัวอย่างนี้ทำ floating overlay ในแอปและเตรียมโครงให้ต่อ extension ได้")
+            Text("ตัวแอปรองรับการแปลเสียงจากไมค์แบบ local และมีโครง ReplayKit สำหรับเสียงจากวิดีโอ/เกมที่ผู้ใช้เริ่ม screen broadcast เอง ส่วน iOS ไม่ให้แอปทั่วไปดัก system audio หรือวาด overlay เหนือแอปอื่นโดยตรง จึงใช้ floating subtitle ภายในแอปและเตรียมทางต่อ PiP/video layer ในขั้นถัดไป")
                 .font(.callout)
                 .foregroundStyle(.secondary)
         }
@@ -111,6 +153,48 @@ struct ContentView: View {
         .padding()
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
     }
+
+    private var historyCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Text("Conversation history")
+                    .font(.headline)
+                Spacer()
+                Button("Clear") {
+                    audioSession.clearHistory()
+                }
+                .buttonStyle(.bordered)
+            }
+
+            if audioSession.history.isEmpty {
+                Text("ยังไม่มีประโยคที่แปล กด Demo voice หรือ Start เพื่อเริ่ม")
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                ForEach(audioSession.history) { entry in
+                    VStack(alignment: .leading, spacing: 5) {
+                        HStack {
+                            Text(entry.mode.rawValue)
+                                .font(.caption.bold())
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text(entry.timestamp, style: .time)
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(.secondary)
+                        }
+                        Text(entry.source)
+                            .font(.callout)
+                        Text(entry.translated)
+                            .font(.headline)
+                    }
+                    .padding(10)
+                    .background(Color.black.opacity(0.16), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+            }
+        }
+        .padding()
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
 }
 
 struct FloatingTranslationOverlay: View {
@@ -120,24 +204,36 @@ struct FloatingTranslationOverlay: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack {
                 Circle().fill(.green).frame(width: 9, height: 9)
-                Text("LOCAL • REALTIME")
+                Text("LOCAL • VOICE • REALTIME")
                     .font(.caption.bold())
                 Spacer()
                 Text("\(audioSession.latencyMillis)ms")
                     .font(.caption.monospacedDigit())
             }
             Text(audioSession.translatedText)
-                .font(.headline)
-                .lineLimit(3)
+                .font(.system(size: audioSession.subtitleFontSize, weight: .bold, design: .rounded))
+                .lineLimit(4)
+            Text(audioSession.partialTranscript)
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.68))
+                .lineLimit(2)
         }
         .padding(14)
         .foregroundStyle(.white)
-        .background(.black.opacity(0.78), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .background(overlayBackground, in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         .overlay(
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .stroke(.white.opacity(0.18))
         )
         .shadow(radius: 18)
+    }
+
+    private var overlayBackground: Color {
+        switch audioSession.subtitleBackground {
+        case "Purple": return Color.purple.opacity(0.78)
+        case "Clear": return Color.black.opacity(0.35)
+        default: return Color.black.opacity(0.78)
+        }
     }
 }
 
