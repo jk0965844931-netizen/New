@@ -60,6 +60,17 @@
 ### 2) ทำซับลอยด้วย Picture-in-Picture
 
 แอปหลักเพิ่ม `PiPSubtitleController` เพื่อ render ข้อความคำแปลเป็นภาพใน `AVSampleBufferDisplayLayer`, attach layer เข้ากับ preview view ในแอป แล้วเปิด `AVPictureInPictureController.ContentSource` แบบ sample-buffer video layer เมื่อ PiP เริ่มแล้ว iOS เป็นเจ้าของหน้าต่าง PiP ผู้ใช้จึงลาก/ขยับ/ย่อ/ขยายได้เหมือน YouTube PiP ไม่ใช่การสร้าง overlay เหนือแอปอื่นแบบ Android
+แอปหลักเพิ่ม `RPSystemBroadcastPickerView` เพื่อเปิด broadcast picker ของ iOS แทนการแอบดักเสียงเอง ผู้ใช้ต้องกดเริ่ม Screen Broadcast ด้วยตัวเอง จากนั้น `LocalAudioBroadcastExtension/SampleHandler.swift` จะได้รับ sample buffers ตามที่ระบบอนุญาต:
+
+- `.audioApp` สำหรับเสียงจากแอป/หน้าจอที่ถูก broadcast
+- `.audioMic` สำหรับไมโครโฟน
+- `.video` สำหรับเฟรมหน้าจอ
+
+ตอนนี้ extension scaffold เขียน payload จำลอง/สถานะล่าสุดลง App Group เพื่อให้แอปหลัก poll กลับมาแสดงผลได้ จุดต่อจริงถัดไปคือส่ง audio buffers เข้า ASR/translation engine ที่อยู่ใน extension หรือ service ที่ผู้ใช้ยินยอม
+
+### 2) ทำซับลอยด้วย Picture-in-Picture
+
+แอปหลักเพิ่ม `PiPSubtitleController` เพื่อ render ข้อความคำแปลเป็นภาพใน `AVSampleBufferDisplayLayer` แล้วเตรียม `AVPictureInPictureController.ContentSource` แบบ sample-buffer video layer วิธีนี้คือแนวทางที่ถูกต้องสำหรับ “หน้าต่างลอย” บน iOS เพราะระบบอนุญาตให้ PiP ลอยข้ามแอป ไม่ใช่การสร้าง overlay เหนือแอปอื่นแบบ Android
 
 ### 3) Privacy/App Store
 

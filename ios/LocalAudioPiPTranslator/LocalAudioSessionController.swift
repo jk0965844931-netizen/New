@@ -203,6 +203,7 @@ final class LocalAudioSessionController: ObservableObject {
     func startBroadcastImport() {
         broadcastImportTimer?.invalidate()
         broadcastStatus = "Polling App Group subtitles from Screen Recording Broadcast Extension…"
+        broadcastStatus = "Polling App Group subtitles from Broadcast Upload Extension…"
         broadcastImportTimer = Timer.scheduledTimer(withTimeInterval: 0.8, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.loadLatestBroadcastSubtitle()
