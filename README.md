@@ -1,65 +1,134 @@
-# Manga Overlay Translator
+# Screen Broadcast PiP Translator
 
-เว็บต้นแบบสำหรับอ่านมังงะพร้อมคำแปลแบบ overlay ที่ออกแบบให้เร็วและใช้งานบน iPhone ได้ โดยเน้น **local-first** ก่อน แล้วเปิดจุดต่อสำหรับ Ollama local, Ollama Cloud และ Hugging Face cloud
+โปรเจกต์นี้เพิ่มต้นแบบ **iOS local realtime screen-broadcast subtitle translator** สำหรับกรณี “เปิด Screen Recording/Broadcast แล้วแปลเสียง/ซับจากหน้าจอเป็น PiP subtitle” พร้อม workflow บน GitHub Actions macOS เพื่อ build ไฟล์ `.ipa` แบบ unsigned
 
-## ฟีเจอร์
+> หมายเหตุสำคัญ: โหมดหลักของแอปนี้คือ Screen Recording/Broadcast ไม่ใช่การอัดเสียงล้วน ๆ เพราะ iOS ไม่อนุญาตให้แอปทั่วไปดัก system audio เองแบบเงียบ ๆ วิธีที่ถูกต้องคือให้ผู้ใช้เริ่ม ReplayKit Broadcast ผ่าน UI ของ iOS แล้วระบบส่งเฟรมหน้าจอและเสียงของแอปที่ broadcast ให้ extension ส่วน PiP จริงต้องอิง video layer; ต้นแบบนี้จึง render ซับเป็น sample-buffer video แล้วเปิด System PiP ที่ลากขยับได้
 
-- **Search mode**: ค้นหาเว็บมังงะหรือเว็บทั่วไปผ่าน DuckDuckGo/Google/Bing/Brave และรองรับ SearXNG JSON endpoint ถ้ามี instance ที่เปิด CORS
-- **Reader mode**: วาง URL รูปภาพหลายบรรทัด แล้วแสดงเป็นหน้าอ่านมังงะ
-- **HTML image extractor**: วาง HTML/source ที่คัดลอกจากเว็บ แล้วให้แอปแยก `<img>`, `srcset`, `data-src` และ URL รูปภาพออกมาให้
-- **Web-in-web mode**: ฝังเว็บจริงผ่าน iframe เมื่อเว็บต้นทางอนุญาต
-- **Overlay editor**: แตะพื้นที่ว่างบนภาพเพื่อวางกรอบคำพูด, แตะกรอบเพื่อแก้ข้อความและตำแหน่งแบบเปอร์เซ็นต์
-- **Auto translate + cache**: แปลทันทีหลังแก้ข้อความในกรอบ และ cache ผลแปลระหว่าง session เพื่อลด latency
-- **Translation providers**:
-  - `local`: dictionary/cache เร็วสุด ไม่ออกเน็ต และเหมาะกับ iPhone มากที่สุด
-  - `ollama`: เรียก Ollama ที่เครื่องผู้ใช้ เช่น `gemma3:4b` หรือ `gemma4:e4b` ถ้าติดตั้งไว้
-  - `ollama-cloud`: เรียก Ollama Cloud ผ่าน `https://ollama.com/api/generate` พร้อม API key ที่เก็บเฉพาะ session
-  - `huggingface`: เรียก Hugging Face Inference API โดย token เก็บเฉพาะ session storage
-- **Mobile-first CSS** รองรับ safe-area, ปุ่มขนาดเหมาะกับ touch และ PWA service worker
+## มีอะไรใน repo นี้
 
-## ใช้ Gemma 4 / Ollama Cloud ได้ไหม?
+- `ios/LocalAudioPiPTranslator.xcodeproj` — Xcode project สำหรับ iOS app
+- `ios/LocalAudioPiPTranslator` — SwiftUI app ที่มี UI สำหรับเริ่ม Screen Broadcast/import ซับ, แสดง transcript, แปล local dictionary, floating subtitle, ReplayKit picker และ PiP subtitle controller
+- `ios/LocalAudioBroadcastExtension` — Broadcast Upload Extension scaffold สำหรับรับ `audioApp`, `audioMic` และ `video` sample buffers จาก Screen Recording ที่ผู้ใช้กดเริ่มเอง
+- `ios/Shared` — โครง shared App Group payload สำหรับส่งซับ/คำแปลล่าสุดจาก extension กลับเข้าแอปหลัก
+- `ios/Scripts/build_unsigned_ipa.sh` — script สร้าง unsigned `.ipa` จาก command line บน macOS/Xcode
+- `.github/workflows/ios-unsigned-ipa.yml` — GitHub Actions workflow ใช้ runner macOS build แล้วอัปโหลด unsigned IPA artifact
+- เว็บเดโมเดิมยังอยู่ที่ `index.html`, `src/main.js`, `src/styles.css` และยังตรวจ syntax ได้ด้วย `npm run build`
 
-ได้ในเชิงสถาปัตยกรรม ถ้าบัญชี/เครื่องของคุณมี model นั้นให้เรียกใช้งาน:
+## ความสามารถของ iOS app ต้นแบบ
 
-1. ถ้าใช้ **Ollama local** ให้ติดตั้งหรือ pull model ในเครื่องที่รัน Ollama แล้วตั้ง endpoint เป็น `http://localhost:11434/api/generate` หรือ IP เครื่องในวง Wi‑Fi เช่น `http://192.168.1.20:11434/api/generate`
-2. ถ้าใช้ **Ollama Cloud** ให้เลือก provider `Ollama Cloud`, ใส่ API key และใส่ชื่อ model cloud ที่บัญชีคุณรองรับ เช่นช่องนี้ตั้งค่าเริ่มต้นเป็น `gemma4:e4b`
-3. บน iPhone โดยตรง การรัน LLM ใหญ่ใน browser ยังไม่เหมาะกับความเร็ว/แบตเตอรี่ จึงแนะนำให้ใช้ local dictionary/cache หรือเรียก cloud ผ่าน HTTPS
+- SwiftUI interface สำหรับ “Screen Broadcast PiP Translator”
+- โหมดหลักเป็น Screen Recording/Broadcast ผ่าน ReplayKit; Microphone เป็น fallback เท่านั้น
+- ใช้ `SFSpeechRecognizer` พร้อม `requiresOnDeviceRecognition = true` เพื่อบังคับแนวทาง local-first เท่าที่อุปกรณ์รองรับ
+- เลือกภาษาต้นทาง/ปลายทางได้ เช่น Auto, English, Japanese, Korean, Chinese, Thai
+- แปลข้อความด้วย dictionary ในเครื่องก่อน และ fallback เป็นข้อความ `[Language] ...` เพื่อไม่ออก network
+- แปลเสียงได้จริงในต้นแบบ: เมื่อมีประโยคใหม่ แอปใช้ `AVSpeechSynthesizer` อ่านคำแปลออกเสียงตามภาษาปลายทาง
+- Floating subtitle ภายในแอป และ System PiP จริงที่ iOS ให้ผู้ใช้ลาก/ขยับได้เหมือน YouTube PiP
+- Conversation history สำหรับดูประโยคต้นฉบับ/คำแปลย้อนหลัง
+- ปุ่ม `Demo subtitle` สำหรับจำลองซับเกม/วิดีโอในเครื่อง
+- โหมดเริ่มต้นคือ `Screen Recording` พร้อม `RPSystemBroadcastPickerView` เพื่อให้ผู้ใช้เริ่ม Broadcast ผ่าน UI ทางการของ iOS
+- Broadcast Upload Extension target ที่รับ `audioApp`, `audioMic`, `video` sample buffers แล้วเขียน subtitle payload ผ่าน App Group
+- PiP subtitle renderer scaffold ที่ render ข้อความแปลลงใน sample-buffer video stream สำหรับ `AVPictureInPictureController`
 
-## วิธีใช้งานแบบเร็ว
 
-### ค้นหาเว็บมังงะหรือเว็บทั่วไป
+## แนวทางเทียบกับแอปแนว ViiTor
 
-1. เปิดแท็บ **ค้นหาเว็บ**
-2. พิมพ์ชื่อเรื่อง/คำค้น แล้วเลือกประเภท `มังงะ`, `เว็บทั่วไป` หรือ `ค้นหารูปภาพ`
-3. กด **เปิดผลค้นหา** เพื่อเปิดผลใน search engine ที่เลือก
-4. ถ้ามี SearXNG instance ที่เปิด CORS ให้ใส่ endpoint แล้วกด **ค้นหาในแอป** เพื่อดึงผลมาแสดงในเว็บนี้
-5. เมื่อเจอเว็บที่ต้องการ ให้เปิดในแท็บใหม่, ส่ง URL ไปยังโหมด **เว็บซ้อนเว็บ**, หรือคัดลอก URL/HTML กลับมาใช้ใน **โหลดรูป**
+ต้นแบบนี้เน้น flow ที่ผู้ใช้คาดหวังจากแอป live subtitle/voice translator:
 
-### อ่านและแปล overlay
+1. ผู้ใช้กดเริ่ม Screen Recording/Broadcast ผ่าน ReplayKit picker
+2. Broadcast Upload Extension รับเฟรมหน้าจอและ app audio ที่มากับ screen broadcast
+3. แปลในเครื่องแบบเร็วที่สุดเท่าที่ทำได้
+4. ส่งผลลัพธ์จาก extension กลับแอปหลักผ่าน App Group
+5. แสดงผลเป็น floating subtitle ภายในแอป และ render เป็น video stream สำหรับ System PiP ที่ผู้ใช้ลากขยับได้
+6. อ่านคำแปลออกเสียงด้วย voice ของภาษาปลายทาง
+7. เก็บ history สั้น ๆ เพื่อย้อนดูบทสนทนา
 
-1. เปิดเว็บ แล้วอยู่ในแท็บ **โหลดรูป**
-2. วาง URL รูปภาพหนึ่งรายการต่อหนึ่งบรรทัด หรือเปิดส่วน **ดึง URL รูปจาก HTML ที่คัดลอกมา** แล้ววาง HTML/source
-3. กดโหลดรูปเข้า reader
-4. แตะพื้นที่บนรูปเพื่อวางกรอบคำพูด
-5. แตะกรอบเพื่อพิมพ์ข้อความต้นฉบับ และปล่อยช่องคำแปลว่างหากต้องการให้ระบบแปลให้
-6. กด **แปล overlay ทั้งหมด** ถ้าต้องการแปลทุกกรอบพร้อมกัน
+ส่วนการทำให้ซับลอยเหนือแอปอื่นหรือฟังเสียงเกม/เพลงโดยตรง ต้องทำผ่าน API ที่ Apple อนุญาต เช่น ReplayKit Broadcast Extension หรือ PiP video layer ไม่ใช่การ bypass sandbox
 
-## ทำเป็นเว็บไซต์จริง
 
-โปรเจกต์นี้เป็น static website จึง deploy ฟรีได้บน GitHub Pages, Netlify หรือ Vercel โดยใช้โฟลเดอร์ root เป็น publish directory ดูขั้นตอนละเอียดใน [`DEPLOY.md`](./DEPLOY.md) วิธีสั้นที่สุดคือ push repo ขึ้น GitHub แล้วเปิด GitHub Pages ที่ Settings → Pages หรือใช้ Netlify/Vercel โดยตั้ง Build command เป็น `npm run build` และ Publish/Output directory เป็น `.`
+## สถาปัตยกรรม iOS แบบ ViiTor ที่เพิ่มในโค้ด
 
-## ข้อจำกัดสำคัญ
+### 1) รับเสียง/หน้าจอข้ามแอปด้วย Broadcast Upload Extension
 
-- การค้นหาในตัวแอปแบบดึงผลกลับมาต้องใช้ SearXNG หรือ search backend ที่เปิด CORS เอง เพราะ search engine ส่วนใหญ่ไม่อนุญาตให้ static browser app scrape ผลโดยตรง
-- เว็บมังงะหลายเว็บไม่ยอมให้ฝัง iframe ด้วย `X-Frame-Options` หรือ `Content-Security-Policy` เว็บนี้จะไม่พยายาม bypass ระบบนั้น
-- รูปภาพจากเว็บอื่นอาจโดน hotlink/CORS block ให้ใช้รูปที่คุณมีสิทธิ์ใช้งาน หรือทำ proxy ฝั่ง server ที่คุณควบคุมเอง
-- OCR เต็มรูปแบบยังไม่รวมใน static app นี้ เพราะ browser ล้วน ๆ จะใหญ่และช้าบนมือถือ หากต้องการ OCR จริงให้ต่อ backend OCR/vision model หรือใช้ model vision ผ่าน provider ที่รองรับ
-- การใช้งานเว็บมังงะจริงควรเคารพลิขสิทธิ์, เงื่อนไขเว็บต้นทาง, robots policy, paywall และ rate limit
-- Token cloud ที่กรอกใน browser เหมาะกับ prototype เท่านั้น ถ้าทำ production ควรทำ backend proxy เพื่อซ่อน secret
+แอปหลักเพิ่ม `RPSystemBroadcastPickerView` เพื่อเปิด Screen Recording/Broadcast picker ของ iOS แทนการอัดเสียงเอง ผู้ใช้ต้องกดเริ่ม Screen Broadcast ด้วยตัวเอง จากนั้น `LocalAudioBroadcastExtension/SampleHandler.swift` จะได้รับ sample buffers ตามที่ระบบอนุญาต:
 
-## คำสั่ง
+- `.audioApp` สำหรับเสียงจากแอป/หน้าจอที่ถูก broadcast
+- `.audioMic` สำหรับไมโครโฟนเสริมถ้าผู้ใช้เปิดเอง แต่ picker ในแอปตั้งค่าเริ่มต้นให้ปิดปุ่มไมค์เพื่อเน้น Screen Recording
+- `.video` สำหรับเฟรมหน้าจอ
+
+ตอนนี้ extension scaffold เขียน payload จำลอง/สถานะล่าสุดลง App Group เพื่อให้แอปหลัก poll กลับมาแสดงผลได้ จุดต่อจริงถัดไปคือส่ง app-audio buffers ที่มากับ screen broadcast เข้า ASR/translation engine ที่อยู่ใน extension หรือ service ที่ผู้ใช้ยินยอม
+
+### 2) ทำซับลอยด้วย Picture-in-Picture
+
+แอปหลักเพิ่ม `PiPSubtitleController` เพื่อ render ข้อความคำแปลเป็นภาพใน `AVSampleBufferDisplayLayer`, attach layer เข้ากับ preview view ในแอป แล้วเปิด `AVPictureInPictureController.ContentSource` แบบ sample-buffer video layer เมื่อ PiP เริ่มแล้ว iOS เป็นเจ้าของหน้าต่าง PiP ผู้ใช้จึงลาก/ขยับ/ย่อ/ขยายได้เหมือน YouTube PiP ไม่ใช่การสร้าง overlay เหนือแอปอื่นแบบ Android
+
+### 3) Privacy/App Store
+
+โครงนี้ตั้งใจใช้เฉพาะ API ทางการ: Speech, Microphone, ReplayKit Broadcast, App Group และ PiP ผู้ใช้ต้องเห็นและอนุญาตการ broadcast เองเสมอ การเปิดใช้ App Group บนเครื่องจริงต้องตั้งค่า entitlement/group identifier ให้ตรงกับบัญชี Apple Developer ของคุณ
+
+## Build unsigned IPA บน GitHub
+
+1. Push repo ขึ้น GitHub
+2. เข้าแท็บ **Actions**
+3. เลือก workflow **Build unsigned iOS IPA**
+4. กด **Run workflow** หรือ push ไฟล์ใน `ios/**`
+5. ดาวน์โหลด artifact ชื่อ `LocalAudioPiPTranslator-unsigned-ipa`
+
+ไฟล์ที่ได้คือ:
+
+```text
+ios/build/LocalAudioPiPTranslator-unsigned.ipa
+```
+
+## Build unsigned IPA บน Mac local
+
+ต้องมี Xcode ติดตั้งไว้ก่อน แล้วรัน:
 
 ```bash
-npm run start
+./ios/Scripts/build_unsigned_ipa.sh
+```
+
+script จะรัน `xcodebuild` ด้วย:
+
+- `CODE_SIGNING_ALLOWED=NO`
+- `CODE_SIGNING_REQUIRED=NO`
+- `CODE_SIGN_IDENTITY=""`
+
+จากนั้น package โฟลเดอร์ `Payload/LocalAudioPiPTranslator.app` เป็น `.ipa` โดย app bundle จะ embed `LocalAudioBroadcastExtension.appex` ถ้า build บน macOS/Xcode สำเร็จ
+
+> หมายเหตุ: unsigned IPA เหมาะสำหรับ artifact/testing pipeline เท่านั้น การทดสอบ App Group/Broadcast Extension บนอุปกรณ์จริงต้อง sign ด้วย provisioning profile ที่เปิด App Groups และ Broadcast Upload Extension ให้ตรงกับ bundle id ของคุณ
+
+## ข้อจำกัดและทางต่อยอดให้เป็นแอปเต็ม
+
+### เสียงจากเพลง/เกมอื่น
+
+- **ทำไม่ได้โดยตรงจาก sandbox ของ iOS app ปกติ**
+- ทางที่ถูกต้องคือใช้ **ReplayKit Broadcast Upload Extension** แล้วให้ผู้ใช้เริ่ม screen broadcast เอง
+- repo นี้เพิ่ม extension scaffold แล้ว: `SampleHandler` รับ `audioApp`, `audioMic`, `video` buffers และ sync ผลลัพธ์ผ่าน App Group/shared container
+
+### PiP / overlay เหนือแอปอื่น
+
+- iOS ไม่มี permission ให้แอปทั่วไปวาด overlay เหนือแอปอื่นเหมือน Android
+- PiP จริงต้องผูกกับ video playback/call UI ที่เป็นไปตาม API ของ Apple
+- repo นี้เพิ่ม `PiPSubtitleController` ที่ attach sample-buffer video layer เข้ากับ preview view และเปิด System PiP จริง เมื่อรันบนอุปกรณ์ที่รองรับ ผู้ใช้จะลาก/ขยับหน้าต่างได้แบบ YouTube PiP
+
+### Local translation model
+
+ต้นแบบนี้ใช้ dictionary ในเครื่องเพื่อความเบาและไม่มี network ถ้าจะทำจริงให้ต่อ:
+
+- Apple Speech on-device สำหรับ ASR ภาษาที่รองรับ
+- Core ML / MLX model สำหรับ translation บนอุปกรณ์
+- quantized model ขนาดเล็กเพื่อ latency ต่ำและประหยัดแบต
+
+## เว็บเดโมเดิม
+
+รันเว็บ static demo:
+
+```bash
+npm start
+```
+
+ตรวจ syntax JavaScript:
+
+```bash
 npm run build
 ```
