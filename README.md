@@ -7,7 +7,9 @@
 ## มีอะไรใน repo นี้
 
 - `ios/LocalAudioPiPTranslator.xcodeproj` — Xcode project สำหรับ iOS app
-- `ios/LocalAudioPiPTranslator` — SwiftUI app ที่มี UI สำหรับเริ่ม/หยุดการฟังเสียง, แสดง transcript, แปล local dictionary, และ floating overlay
+- `ios/LocalAudioPiPTranslator` — SwiftUI app ที่มี UI สำหรับเริ่ม/หยุดการฟังเสียง, แสดง transcript, แปล local dictionary, floating overlay, ReplayKit picker และ PiP subtitle controller
+- `ios/LocalAudioBroadcastExtension` — Broadcast Upload Extension scaffold สำหรับรับ `audioApp`, `audioMic` และ `video` sample buffers จาก Screen Recording ที่ผู้ใช้กดเริ่มเอง
+- `ios/Shared` — โครง shared App Group payload สำหรับส่งซับ/คำแปลล่าสุดจาก extension กลับเข้าแอปหลัก
 - `ios/Scripts/build_unsigned_ipa.sh` — script สร้าง unsigned `.ipa` จาก command line บน macOS/Xcode
 - `.github/workflows/ios-unsigned-ipa.yml` — GitHub Actions workflow ใช้ runner macOS build แล้วอัปโหลด unsigned IPA artifact
 - เว็บเดโมเดิมยังอยู่ที่ `index.html`, `src/main.js`, `src/styles.css` และยังตรวจ syntax ได้ด้วย `npm run build`
@@ -23,7 +25,9 @@
 - Floating subtitle แบบ PiP-style ภายในแอป พร้อมปรับขนาดตัวอักษร สีพื้นหลัง และเปิด/ปิดเสียงแปล
 - Conversation history สำหรับดูประโยคต้นฉบับ/คำแปลย้อนหลัง
 - ปุ่ม `Demo voice` สำหรับจำลองประโยคเกม/เพลงในเครื่อง
-- โหมดเลือก `ReplayKit / Screen Recording` เพื่อสื่อสาร pipeline ที่ถูกต้องสำหรับการรับเสียงจากเกม/แอปอื่นในอนาคต
+- โหมดเลือก `ReplayKit / Screen Recording` พร้อม `RPSystemBroadcastPickerView` เพื่อให้ผู้ใช้เริ่ม Broadcast ผ่าน UI ทางการของ iOS
+- Broadcast Upload Extension target ที่รับ `audioApp`, `audioMic`, `video` sample buffers แล้วเขียน subtitle payload ผ่าน App Group
+- PiP subtitle renderer scaffold ที่ render ข้อความแปลลงใน sample-buffer video stream สำหรับ `AVPictureInPictureController`
 
 
 ## แนวทางเทียบกับแอปแนว ViiTor
@@ -33,11 +37,33 @@
 1. ฟังเสียงแบบ realtime จากไมค์หรือ pipeline ที่ผู้ใช้อนุญาต
 2. ถอดเสียงเป็น live transcript
 3. แปลในเครื่องแบบเร็วที่สุดเท่าที่ทำได้
-4. แสดงผลเป็น floating subtitle
-5. อ่านคำแปลออกเสียงด้วย voice ของภาษาปลายทาง
-6. เก็บ history สั้น ๆ เพื่อย้อนดูบทสนทนา
+4. ส่งผลลัพธ์จาก extension กลับแอปหลักผ่าน App Group
+5. แสดงผลเป็น floating subtitle ภายในแอป และเตรียม render เป็น video stream สำหรับ PiP
+6. อ่านคำแปลออกเสียงด้วย voice ของภาษาปลายทาง
+7. เก็บ history สั้น ๆ เพื่อย้อนดูบทสนทนา
 
 ส่วนการทำให้ซับลอยเหนือแอปอื่นหรือฟังเสียงเกม/เพลงโดยตรง ต้องทำผ่าน API ที่ Apple อนุญาต เช่น ReplayKit Broadcast Extension หรือ PiP video layer ไม่ใช่การ bypass sandbox
+
+
+## สถาปัตยกรรม iOS แบบ ViiTor ที่เพิ่มในโค้ด
+
+### 1) รับเสียง/หน้าจอข้ามแอปด้วย Broadcast Upload Extension
+
+แอปหลักเพิ่ม `RPSystemBroadcastPickerView` เพื่อเปิด broadcast picker ของ iOS แทนการแอบดักเสียงเอง ผู้ใช้ต้องกดเริ่ม Screen Broadcast ด้วยตัวเอง จากนั้น `LocalAudioBroadcastExtension/SampleHandler.swift` จะได้รับ sample buffers ตามที่ระบบอนุญาต:
+
+- `.audioApp` สำหรับเสียงจากแอป/หน้าจอที่ถูก broadcast
+- `.audioMic` สำหรับไมโครโฟน
+- `.video` สำหรับเฟรมหน้าจอ
+
+ตอนนี้ extension scaffold เขียน payload จำลอง/สถานะล่าสุดลง App Group เพื่อให้แอปหลัก poll กลับมาแสดงผลได้ จุดต่อจริงถัดไปคือส่ง audio buffers เข้า ASR/translation engine ที่อยู่ใน extension หรือ service ที่ผู้ใช้ยินยอม
+
+### 2) ทำซับลอยด้วย Picture-in-Picture
+
+แอปหลักเพิ่ม `PiPSubtitleController` เพื่อ render ข้อความคำแปลเป็นภาพใน `AVSampleBufferDisplayLayer` แล้วเตรียม `AVPictureInPictureController.ContentSource` แบบ sample-buffer video layer วิธีนี้คือแนวทางที่ถูกต้องสำหรับ “หน้าต่างลอย” บน iOS เพราะระบบอนุญาตให้ PiP ลอยข้ามแอป ไม่ใช่การสร้าง overlay เหนือแอปอื่นแบบ Android
+
+### 3) Privacy/App Store
+
+โครงนี้ตั้งใจใช้เฉพาะ API ทางการ: Speech, Microphone, ReplayKit Broadcast, App Group และ PiP ผู้ใช้ต้องเห็นและอนุญาตการ broadcast เองเสมอ การเปิดใช้ App Group บนเครื่องจริงต้องตั้งค่า entitlement/group identifier ให้ตรงกับบัญชี Apple Developer ของคุณ
 
 ## Build unsigned IPA บน GitHub
 
@@ -67,21 +93,23 @@ script จะรัน `xcodebuild` ด้วย:
 - `CODE_SIGNING_REQUIRED=NO`
 - `CODE_SIGN_IDENTITY=""`
 
-จากนั้น package โฟลเดอร์ `Payload/LocalAudioPiPTranslator.app` เป็น `.ipa`
+จากนั้น package โฟลเดอร์ `Payload/LocalAudioPiPTranslator.app` เป็น `.ipa` โดย app bundle จะ embed `LocalAudioBroadcastExtension.appex` ถ้า build บน macOS/Xcode สำเร็จ
+
+> หมายเหตุ: unsigned IPA เหมาะสำหรับ artifact/testing pipeline เท่านั้น การทดสอบ App Group/Broadcast Extension บนอุปกรณ์จริงต้อง sign ด้วย provisioning profile ที่เปิด App Groups และ Broadcast Upload Extension ให้ตรงกับ bundle id ของคุณ
 
 ## ข้อจำกัดและทางต่อยอดให้เป็นแอปเต็ม
 
 ### เสียงจากเพลง/เกมอื่น
 
 - **ทำไม่ได้โดยตรงจาก sandbox ของ iOS app ปกติ**
-- ทางที่ถูกต้องคือเพิ่ม **ReplayKit Broadcast Upload Extension** แล้วให้ผู้ใช้เริ่ม screen broadcast เอง
-- ใน extension ให้รับ audio sample buffer, ส่งเข้า on-device ASR/translator, แล้ว sync ผลลัพธ์กลับ app group/shared container
+- ทางที่ถูกต้องคือใช้ **ReplayKit Broadcast Upload Extension** แล้วให้ผู้ใช้เริ่ม screen broadcast เอง
+- repo นี้เพิ่ม extension scaffold แล้ว: `SampleHandler` รับ `audioApp`, `audioMic`, `video` buffers และ sync ผลลัพธ์ผ่าน App Group/shared container
 
 ### PiP / overlay เหนือแอปอื่น
 
 - iOS ไม่มี permission ให้แอปทั่วไปวาด overlay เหนือแอปอื่นเหมือน Android
 - PiP จริงต้องผูกกับ video playback/call UI ที่เป็นไปตาม API ของ Apple
-- สำหรับการใช้งานจริงควรทำเป็น PiP video layer ที่ render caption หรือใช้ Broadcast/SharePlay workflow ตามข้อจำกัดของระบบ
+- repo นี้เพิ่ม `PiPSubtitleController` ที่ render caption เป็น sample-buffer video layer สำหรับ PiP แล้ว จุดถัดไปคือทดสอบบนอุปกรณ์จริงและปรับ lifecycle/ขนาดหน้าต่าง
 
 ### Local translation model
 

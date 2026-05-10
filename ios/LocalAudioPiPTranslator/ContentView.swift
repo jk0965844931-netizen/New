@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject private var audioSession: LocalAudioSessionController
+    @StateObject private var pipSubtitleController = PiPSubtitleController()
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -10,6 +11,7 @@ struct ContentView: View {
                     header
                     controls
                     subtitleStyleCard
+                    viitorPipelineCard
                     limitationCard
                     transcriptCard
                     historyCard
@@ -24,6 +26,9 @@ struct ContentView: View {
                     .environmentObject(audioSession)
                     .padding()
             }
+        }
+        .onChange(of: audioSession.translatedText) { newValue in
+            pipSubtitleController.updateSubtitle(newValue)
         }
     }
 
@@ -115,6 +120,71 @@ struct ContentView: View {
             }
             .pickerStyle(.segmented)
             Text("ปรับซับลอยแบบที่แอปแปลสดนิยมมี: ขนาดตัวอักษร, สีพื้นหลัง, และเปิด/ปิดเสียงแปล")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding()
+        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
+
+    private var viitorPipelineCard: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Label("ViiTor-style iOS pipeline", systemImage: "pip.enter")
+                .font(.headline)
+
+            Text("1) ผู้ใช้เริ่ม Screen Broadcast ผ่านปุ่มของ iOS  2) Broadcast Upload Extension รับ audio/video sample buffers  3) แอปอ่านคำแปลผ่าน App Group  4) PiP renderer ทำซับเป็นวิดีโอเล็กที่ iOS อนุญาตให้ลอยข้ามแอป")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+
+            HStack(spacing: 12) {
+                BroadcastPickerView(preferredExtensionBundleIdentifier: "dev.local.audio-pip-translator.broadcast")
+                    .frame(width: 52, height: 52)
+                    .background(Color.white.opacity(0.16), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Start iOS Broadcast")
+                        .font(.subheadline.bold())
+                    Text("กดเพื่อเปิด picker อย่างเป็นทางการของ ReplayKit")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+
+            HStack {
+                Button("Import broadcast subtitles") {
+                    audioSession.startBroadcastImport()
+                }
+                .buttonStyle(.borderedProminent)
+
+                Button("Refresh once") {
+                    audioSession.loadLatestBroadcastSubtitle()
+                }
+                .buttonStyle(.bordered)
+
+                Button("Stop import") {
+                    audioSession.stopBroadcastImport()
+                }
+                .buttonStyle(.bordered)
+            }
+
+            HStack {
+                Button("Start PiP subtitles") {
+                    pipSubtitleController.updateSubtitle(audioSession.translatedText)
+                    pipSubtitleController.startPictureInPicture()
+                }
+                .buttonStyle(.borderedProminent)
+
+                Button("Stop PiP") {
+                    pipSubtitleController.stopPictureInPicture()
+                }
+                .buttonStyle(.bordered)
+            }
+
+            Text(audioSession.broadcastStatus)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(pipSubtitleController.statusMessage)
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

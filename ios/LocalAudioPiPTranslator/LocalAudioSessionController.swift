@@ -62,6 +62,7 @@ final class LocalAudioSessionController: ObservableObject {
     @Published var subtitleFontSize = 20.0
     @Published var subtitleBackground = "Dark"
     @Published var latencyMillis = 0
+    @Published var broadcastStatus = "Broadcast extension bridge is idle."
     @Published private(set) var history: [TranslationEntry] = []
 
     private let audioEngine = AVAudioEngine()
@@ -70,6 +71,7 @@ final class LocalAudioSessionController: ObservableObject {
     private var recognitionTask: SFSpeechRecognitionTask?
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
     private var lastCommittedTranscript = ""
+    private var broadcastImportTimer: Timer?
 
     private let localDictionary: [String: [String: String]] = [
         "th": [
@@ -157,6 +159,7 @@ final class LocalAudioSessionController: ObservableObject {
         recognitionRequest?.endAudio()
         recognitionRequest = nil
         synthesizer.stopSpeaking(at: .immediate)
+        stopBroadcastImport()
 
         if audioEngine.isRunning {
             audioEngine.inputNode.removeTap(onBus: 0)
@@ -186,6 +189,49 @@ final class LocalAudioSessionController: ObservableObject {
     func clearHistory() {
         history.removeAll()
         lastCommittedTranscript = ""
+    }
+
+    func startBroadcastImport() {
+        broadcastImportTimer?.invalidate()
+        broadcastStatus = "Polling App Group subtitles from Broadcast Upload Extension…"
+        broadcastImportTimer = Timer.scheduledTimer(withTimeInterval: 0.8, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.loadLatestBroadcastSubtitle()
+            }
+        }
+    }
+
+    func stopBroadcastImport() {
+        broadcastImportTimer?.invalidate()
+        broadcastImportTimer = nil
+        if broadcastStatus.hasPrefix("Polling") {
+            broadcastStatus = "Broadcast extension bridge is idle."
+        }
+    }
+
+    func loadLatestBroadcastSubtitle() {
+        guard let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: AppGroupConfig.groupIdentifier) else {
+            broadcastStatus = "App Group is unavailable. Configure the shared group entitlement before device testing."
+            return
+        }
+
+        let url = container.appendingPathComponent(AppGroupConfig.latestSubtitleFileName)
+        guard let data = try? Data(contentsOf: url),
+              let payload = try? JSONDecoder().decode(BroadcastSubtitlePayload.self, from: data) else {
+            broadcastStatus = "Waiting for Broadcast Upload Extension samples…"
+            return
+        }
+
+        partialTranscript = payload.sourceText
+        translatedText = payload.translatedText
+        broadcastStatus = "Updated from ReplayKit broadcast at \(payload.updatedAt.formatted(date: .omitted, time: .standard))."
+
+        if payload.sourceText != lastCommittedTranscript {
+            lastCommittedTranscript = payload.sourceText
+            history.insert(.init(source: payload.sourceText, translated: payload.translatedText, mode: .replayKit, timestamp: payload.updatedAt), at: 0)
+            history = Array(history.prefix(20))
+            speakIfNeeded(payload.translatedText)
+        }
     }
 
     private func configureAudioSession() throws {
