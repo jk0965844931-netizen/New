@@ -82,6 +82,7 @@
 						A10000000000000000000031 /* LocalAudioPiPTranslator */,
 				B10000000000000000000022 /* LocalAudioBroadcastExtension */,
 				B10000000000000000000023 /* Shared */,
+				A10000000000000000000031 /* LocalAudioPiPTranslator */,
 				A10000000000000000000032 /* Products */,
 			);
 			sourceTree = "<group>";
