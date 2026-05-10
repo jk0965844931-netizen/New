@@ -5,6 +5,9 @@
          <BuildActionEntry buildForTesting="YES" buildForRunning="YES" buildForProfiling="YES" buildForArchiving="YES" buildForAnalyzing="YES">
             <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="A10000000000000000000040" BuildableName="LocalAudioPiPTranslator.app" BlueprintName="LocalAudioPiPTranslator" ReferencedContainer="container:LocalAudioPiPTranslator.xcodeproj"/>
          </BuildActionEntry>
+         <BuildActionEntry buildForTesting="YES" buildForRunning="YES" buildForProfiling="YES" buildForArchiving="YES" buildForAnalyzing="YES">
+            <BuildableReference BuildableIdentifier="primary" BlueprintIdentifier="B10000000000000000000040" BuildableName="LocalAudioBroadcastExtension.appex" BlueprintName="LocalAudioBroadcastExtension" ReferencedContainer="container:LocalAudioPiPTranslator.xcodeproj"/>
+         </BuildActionEntry>
       </BuildActionEntries>
    </BuildAction>
    <TestAction buildConfiguration="Debug" selectedDebuggerIdentifier="Xcode.DebuggerFoundation.Debugger.LLDB" selectedLauncherIdentifier="Xcode.DebuggerFoundation.Launcher.LLDB" shouldUseLaunchSchemeArgsEnv="YES"/>

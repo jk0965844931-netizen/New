@@ -12,7 +12,6 @@ final class SampleHandler: RPBroadcastSampleHandler {
         writer.write(
             sourceText: "Broadcast started",
             translatedText: "เริ่มรับ Screen Recording จาก Broadcast Upload Extension แล้ว",
-            translatedText: "เริ่มรับเสียง/หน้าจอจาก Broadcast Upload Extension แล้ว",
             sourceLanguage: "system",
             targetLanguage: "th"
         )

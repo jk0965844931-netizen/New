@@ -11,18 +11,22 @@ jobs:
   unsigned-ipa:
     name: Build unsigned IPA on macOS
     runs-on: macos-15
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode.app
+        run: |
+          sudo xcode-select -s /Applications/Xcode.app
+          xcodebuild -version
 
       - name: Build unsigned IPA
         run: ./ios/Scripts/build_unsigned_ipa.sh
 
       - name: Upload unsigned IPA artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: LocalAudioPiPTranslator-unsigned-ipa
           path: ios/build/LocalAudioPiPTranslator-unsigned.ipa
