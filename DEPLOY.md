@@ -49,12 +49,30 @@ npm run start
 
 มีไฟล์ `vercel.json` ตั้งค่า static routing ไว้ให้แล้ว
 
+
+## เพิ่มระบบค้นหาเว็บ
+
+แอปมีแท็บ **ค้นหาเว็บ** ที่ใช้งานได้หลัง deploy ทันทีแบบไม่ต้องมี backend โดยจะเปิดผลค้นหาใน DuckDuckGo, Google, Bing หรือ Brave Search ในแท็บใหม่
+
+ถ้าต้องการให้ผลค้นหาแสดงในหน้าเว็บของเราเอง ให้ตั้ง SearXNG instance หรือ search backend ของคุณเอง แล้วเปิด JSON API + CORS จากนั้นใส่ endpoint ในช่อง `SearXNG JSON endpoint` เช่น `https://searx.example.com/search` แอปจะเรียกด้วย `q=<คำค้น>&format=json`
+
+> หมายเหตุ: static website ไม่ควร scrape search engine หรือเว็บมังงะโดยตรงจาก browser เพราะมักติด CORS/ToS/rate limit และอาจละเมิดเงื่อนไขเว็บต้นทาง
+
 ## เรื่อง Ollama และ Hugging Face หลัง deploy
 
 - `local` provider ใช้ได้ทันที เพราะไม่ต้องเรียก server ภายนอก
 - `Hugging Face cloud` ใช้ได้ถ้าใส่ token ในหน้าเว็บ แต่ production จริงควรทำ backend proxy เพื่อไม่ให้ token อยู่ใน browser
-- `Ollama local` บนเว็บ HTTPS ที่ deploy แล้วอาจเรียก `http://localhost:11434` ไม่ได้เพราะ browser มี mixed-content/CORS policy ให้ใช้ตอนทดสอบ local หรือทำ HTTPS proxy ที่คุณควบคุม
+- `Ollama Cloud` ใช้ได้ถ้ามี API key และ model ที่บัญชีคุณรองรับ โดยเว็บตั้ง endpoint เริ่มต้นเป็น `https://ollama.com/api/generate`
+- `Ollama local` บนเว็บ HTTPS ที่ deploy แล้วอาจเรียก `http://localhost:11434` ไม่ได้เพราะ browser มี mixed-content/CORS policy ให้ใช้ตอนทดสอบ local, ตั้ง endpoint เป็น IP เครื่องในวง Wi‑Fi สำหรับ iPhone หรือทำ HTTPS proxy ที่คุณควบคุม
 
 ## ข้อจำกัดของเว็บซ้อนเว็บ
 
 โหมด iframe จะใช้ได้เฉพาะเว็บมังงะที่อนุญาตให้ฝังเท่านั้น ถ้าเว็บปลายทางตั้งค่า `X-Frame-Options` หรือ `Content-Security-Policy` ห้ามฝัง หน้าเว็บจะไม่แสดง และแอปนี้จะไม่ bypass ระบบป้องกันของเว็บต้นทาง
+
+
+## การนำเว็บมังงะจริงมาใช้
+
+- ถ้าเว็บต้นทางอนุญาต iframe ให้ใช้โหมด **เว็บซ้อนเว็บ** ได้โดยตรง
+- ถ้าเว็บไม่อนุญาต iframe ให้ใช้โหมด **โหลดรูป** ด้วย URL รูปภาพที่คุณมีสิทธิ์ใช้งาน หรือวาง HTML/source เพื่อให้แอปแยก URL รูปภาพ
+- แอปนี้ตั้งใจไม่ bypass CORS, hotlink protection, paywall หรือระบบป้องกันอื่น ๆ ของเว็บต้นทาง
+- สำหรับระบบ production ที่ต้องโหลดรูปเร็วและเสถียร ควรทำ backend/proxy ของตัวเองที่ตรวจสิทธิ์, cache ภาพอย่างเหมาะสม และเคารพเงื่อนไขเว็บต้นทาง
