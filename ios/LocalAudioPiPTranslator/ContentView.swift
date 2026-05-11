@@ -29,6 +29,7 @@ struct ContentView: View {
         }
         .onChange(of: audioSession.translatedText) { newValue in
             pipSubtitleController.updateSubtitle(newValue, transcript: audioSession.partialTranscript)
+            pipSubtitleController.updateSubtitle(newValue)
         }
     }
 
