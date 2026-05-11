@@ -28,6 +28,7 @@ struct ContentView: View {
             }
         }
         .onChange(of: audioSession.translatedText) { newValue in
+            pipSubtitleController.updateSubtitle(newValue, transcript: audioSession.partialTranscript)
             pipSubtitleController.updateSubtitle(newValue)
         }
     }
@@ -170,7 +171,7 @@ struct ContentView: View {
 
             HStack {
                 Button("Start movable PiP") {
-                    pipSubtitleController.updateSubtitle(audioSession.translatedText)
+                    pipSubtitleController.updateSubtitle(audioSession.translatedText, transcript: audioSession.partialTranscript)
                     pipSubtitleController.startPictureInPicture()
                 }
                 .buttonStyle(.borderedProminent)
@@ -192,7 +193,7 @@ struct ContentView: View {
                 .foregroundStyle(.secondary)
 
             PiPSubtitlePreviewView(controller: pipSubtitleController)
-                .frame(height: 76)
+                .frame(height: 96)
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .overlay(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)

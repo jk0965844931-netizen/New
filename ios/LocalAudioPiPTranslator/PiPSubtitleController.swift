@@ -1,6 +1,4 @@
-import AVFoundation
 import AVKit
-import CoreMedia
 import SwiftUI
 import UIKit
 
@@ -8,46 +6,69 @@ import UIKit
 final class PiPSubtitleController: NSObject, ObservableObject {
     @Published private(set) var isPictureInPicturePossible = false
     @Published private(set) var isPictureInPictureActive = false
-    @Published private(set) var statusMessage = "PiP subtitle renderer is ready."
+    @Published private(set) var statusMessage = "Attach the PiP preview, then start System PiP."
 
-    fileprivate let displayLayer = AVSampleBufferDisplayLayer()
+    fileprivate let sourceView = SubtitlePiPSourceView()
     private var pictureInPictureController: AVPictureInPictureController?
+    private var contentViewController: UIViewController?
     private var currentSubtitle = "คำแปลจะแสดงในหน้าต่าง PiP"
+    private var currentTranscript = "Screen Broadcast subtitle preview"
 
     override init() {
         super.init()
-        configureDisplayLayer()
-        configurePictureInPicture()
-        renderSubtitleFrame(currentSubtitle)
-    }
-
-    func updateSubtitle(_ text: String) {
-        currentSubtitle = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? currentSubtitle : text
-        renderSubtitleFrame(currentSubtitle)
+        sourceView.update(subtitle: currentSubtitle, transcript: currentTranscript)
     }
 
     var systemPiPDescription: String {
-        "This uses AVPictureInPictureController, so once PiP starts iOS owns the floating window and the user can drag it around like YouTube PiP."
+        "This uses the system AVPictureInPictureController video-call content source. After it starts, iOS owns the floating window, so it can be dragged or collapsed like YouTube PiP."
     }
 
-    func attachDisplayLayer(to view: UIView) {
-        if displayLayer.superlayer !== view.layer {
-            displayLayer.removeFromSuperlayer()
-            view.layer.addSublayer(displayLayer)
+    func updateSubtitle(_ text: String, transcript: String = "") {
+        let cleanedSubtitle = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !cleanedSubtitle.isEmpty { currentSubtitle = cleanedSubtitle }
+
+        let cleanedTranscript = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !cleanedTranscript.isEmpty { currentTranscript = cleanedTranscript }
+
+        sourceView.update(subtitle: currentSubtitle, transcript: currentTranscript)
+        if let contentView = contentViewController?.view as? SubtitlePiPSourceView {
+            contentView.update(subtitle: currentSubtitle, transcript: currentTranscript)
         }
-        displayLayer.frame = view.bounds
-        isPictureInPicturePossible = pictureInPictureController?.isPictureInPicturePossible ?? false
+    }
+
+    func attachSourceView(to view: UIView) {
+        if sourceView.superview !== view {
+            sourceView.removeFromSuperview()
+            sourceView.translatesAutoresizingMaskIntoConstraints = false
+            view.addSubview(sourceView)
+            NSLayoutConstraint.activate([
+                sourceView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+                sourceView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+                sourceView.topAnchor.constraint(equalTo: view.topAnchor),
+                sourceView.bottomAnchor.constraint(equalTo: view.bottomAnchor)
+            ])
+        }
+        configurePictureInPictureIfPossible()
     }
 
     func startPictureInPicture() {
+        configurePictureInPictureIfPossible()
+
+        guard sourceView.window != nil else {
+            statusMessage = "PiP preview is not attached yet. Wait for the preview card to appear, then tap Start movable PiP again."
+            return
+        }
         guard let pictureInPictureController else {
-            statusMessage = "PiP is unavailable on this device."
+            statusMessage = "System PiP is unavailable on this device or iOS version."
             return
         }
         guard pictureInPictureController.isPictureInPicturePossible else {
-            statusMessage = "PiP is not possible until the sample-buffer video layer is ready."
+            isPictureInPicturePossible = false
+            statusMessage = "System PiP is not possible yet. Keep the preview visible and try again."
             return
         }
+
+        updateSubtitle(currentSubtitle, transcript: currentTranscript)
         pictureInPictureController.startPictureInPicture()
     }
 
@@ -55,65 +76,42 @@ final class PiPSubtitleController: NSObject, ObservableObject {
         pictureInPictureController?.stopPictureInPicture()
     }
 
-    private func configureDisplayLayer() {
-        displayLayer.videoGravity = .resizeAspect
-        displayLayer.backgroundColor = UIColor.clear.cgColor
-    }
-
-    private func configurePictureInPicture() {
+    private func configurePictureInPictureIfPossible() {
+        guard pictureInPictureController == nil else {
+            isPictureInPicturePossible = pictureInPictureController?.isPictureInPicturePossible ?? false
+            return
+        }
         guard AVPictureInPictureController.isPictureInPictureSupported() else {
             statusMessage = "This device does not support Picture in Picture."
             return
         }
+        guard sourceView.window != nil else {
+            statusMessage = "PiP preview is ready; attach it on screen before starting PiP."
+            return
+        }
 
         if #available(iOS 15.0, *) {
+            let pipContentView = SubtitlePiPSourceView()
+            pipContentView.update(subtitle: currentSubtitle, transcript: currentTranscript)
+
+            let callViewController = AVPictureInPictureVideoCallViewController()
+            callViewController.preferredContentSize = CGSize(width: 980, height: 220)
+            callViewController.view = pipContentView
+            contentViewController = callViewController
+
             let contentSource = AVPictureInPictureController.ContentSource(
-                sampleBufferDisplayLayer: displayLayer,
-                playbackDelegate: self
+                activeVideoCallSourceView: sourceView,
+                contentViewController: callViewController
             )
             let controller = AVPictureInPictureController(contentSource: contentSource)
             controller.canStartPictureInPictureAutomaticallyFromInline = false
             controller.delegate = self
             pictureInPictureController = controller
             isPictureInPicturePossible = controller.isPictureInPicturePossible
+            statusMessage = "System PiP is ready. Tap Start movable PiP; the window should show subtitles instead of a black frame."
         } else {
-            statusMessage = "Sample-buffer PiP subtitles require iOS 15 or newer."
+            statusMessage = "Movable System PiP subtitles require iOS 15 or newer."
         }
-    }
-
-    private func renderSubtitleFrame(_ subtitle: String) {
-        let size = CGSize(width: 980, height: 220)
-        let renderer = UIGraphicsImageRenderer(size: size)
-        let image = renderer.image { context in
-            UIColor.black.withAlphaComponent(0.72).setFill()
-            UIBezierPath(roundedRect: CGRect(origin: .zero, size: size), cornerRadius: 34).fill()
-
-            let paragraph = NSMutableParagraphStyle()
-            paragraph.alignment = .center
-            paragraph.lineBreakMode = .byWordWrapping
-
-            let attributes: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 54, weight: .bold),
-                .foregroundColor: UIColor.white,
-                .paragraphStyle: paragraph
-            ]
-            let rect = CGRect(x: 42, y: 42, width: size.width - 84, height: size.height - 84)
-            subtitle.draw(with: rect, options: [.usesLineFragmentOrigin, .usesFontLeading], attributes: attributes, context: nil)
-            context.cgContext.setStrokeColor(UIColor.white.withAlphaComponent(0.18).cgColor)
-            context.cgContext.setLineWidth(3)
-            context.cgContext.stroke(CGRect(origin: .zero, size: size).insetBy(dx: 2, dy: 2))
-        }
-
-        guard let sampleBuffer = image.makeSampleBuffer() else {
-            statusMessage = "Could not render subtitle frame for PiP."
-            return
-        }
-
-        if displayLayer.status == .failed {
-            displayLayer.flush()
-        }
-        displayLayer.enqueue(sampleBuffer)
-        statusMessage = "Rendered subtitle into PiP video stream."
     }
 }
 
@@ -121,7 +119,21 @@ extension PiPSubtitleController: AVPictureInPictureControllerDelegate {
     nonisolated func pictureInPictureControllerWillStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
         Task { @MainActor in
             isPictureInPictureActive = true
-            statusMessage = "System PiP subtitles are starting. Drag the PiP window like YouTube PiP."
+            statusMessage = "System PiP subtitles are starting. Drag or collapse the PiP window like YouTube PiP."
+        }
+    }
+
+    nonisolated func pictureInPictureControllerDidStartPictureInPicture(_ pictureInPictureController: AVPictureInPictureController) {
+        Task { @MainActor in
+            isPictureInPictureActive = true
+            statusMessage = "System PiP is active. If you collapse it, tap the side handle to expand it again."
+        }
+    }
+
+    nonisolated func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, failedToStartPictureInPictureWithError error: Error) {
+        Task { @MainActor in
+            isPictureInPictureActive = false
+            statusMessage = "PiP failed to start: \(error.localizedDescription)"
         }
     }
 
@@ -133,113 +145,85 @@ extension PiPSubtitleController: AVPictureInPictureControllerDelegate {
     }
 }
 
-@available(iOS 15.0, *)
-extension PiPSubtitleController: AVPictureInPictureSampleBufferPlaybackDelegate {
-    nonisolated func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, setPlaying playing: Bool) {}
-
-    nonisolated func pictureInPictureControllerTimeRangeForPlayback(_ pictureInPictureController: AVPictureInPictureController) -> CMTimeRange {
-        CMTimeRange(start: .zero, duration: CMTime(value: 1, timescale: 1))
-    }
-
-    nonisolated func pictureInPictureControllerIsPlaybackPaused(_ pictureInPictureController: AVPictureInPictureController) -> Bool {
-        false
-    }
-
-    nonisolated func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, didTransitionToRenderSize newRenderSize: CMVideoDimensions) {}
-
-    nonisolated func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, skipByInterval skipInterval: CMTime, completion completionHandler: @escaping () -> Void) {
-        completionHandler()
-    }
-}
-
-private extension UIImage {
-    func makeSampleBuffer() -> CMSampleBuffer? {
-        guard let cgImage else { return nil }
-        var pixelBuffer: CVPixelBuffer?
-        let attrs = [
-            kCVPixelBufferCGImageCompatibilityKey: true,
-            kCVPixelBufferCGBitmapContextCompatibilityKey: true
-        ] as CFDictionary
-
-        let status = CVPixelBufferCreate(
-            kCFAllocatorDefault,
-            cgImage.width,
-            cgImage.height,
-            kCVPixelFormatType_32ARGB,
-            attrs,
-            &pixelBuffer
-        )
-        guard status == kCVReturnSuccess, let pixelBuffer else { return nil }
-
-        CVPixelBufferLockBaseAddress(pixelBuffer, [])
-        defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, []) }
-
-        guard let context = CGContext(
-            data: CVPixelBufferGetBaseAddress(pixelBuffer),
-            width: cgImage.width,
-            height: cgImage.height,
-            bitsPerComponent: 8,
-            bytesPerRow: CVPixelBufferGetBytesPerRow(pixelBuffer),
-            space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.noneSkipFirst.rawValue
-        ) else { return nil }
-        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: cgImage.width, height: cgImage.height))
-
-        var formatDescription: CMVideoFormatDescription?
-        CMVideoFormatDescriptionCreateForImageBuffer(
-            allocator: kCFAllocatorDefault,
-            imageBuffer: pixelBuffer,
-            formatDescriptionOut: &formatDescription
-        )
-        guard let formatDescription else { return nil }
-
-        var timing = CMSampleTimingInfo(
-            duration: CMTime(value: 1, timescale: 30),
-            presentationTimeStamp: CMClockGetTime(CMClockGetHostTimeClock()),
-            decodeTimeStamp: .invalid
-        )
-        var sampleBuffer: CMSampleBuffer?
-        CMSampleBufferCreateReadyWithImageBuffer(
-            allocator: kCFAllocatorDefault,
-            imageBuffer: pixelBuffer,
-            formatDescription: formatDescription,
-            sampleTiming: &timing,
-            sampleBufferOut: &sampleBuffer
-        )
-        return sampleBuffer
-    }
-}
-
 struct PiPSubtitlePreviewView: UIViewRepresentable {
     @ObservedObject var controller: PiPSubtitleController
 
-    func makeUIView(context: Context) -> PiPSubtitleContainerView {
-        let view = PiPSubtitleContainerView()
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
         view.backgroundColor = .clear
-        view.attach(controller.displayLayer)
+        controller.attachSourceView(to: view)
         return view
     }
 
-    func updateUIView(_ uiView: PiPSubtitleContainerView, context: Context) {
-        uiView.attach(controller.displayLayer)
-        controller.attachDisplayLayer(to: uiView)
+    func updateUIView(_ uiView: UIView, context: Context) {
+        controller.attachSourceView(to: uiView)
     }
 }
 
-final class PiPSubtitleContainerView: UIView {
-    private weak var hostedLayer: AVSampleBufferDisplayLayer?
+final class SubtitlePiPSourceView: UIView {
+    private let badgeLabel = UILabel()
+    private let subtitleLabel = UILabel()
+    private let transcriptLabel = UILabel()
 
-    func attach(_ layer: AVSampleBufferDisplayLayer) {
-        hostedLayer = layer
-        if layer.superlayer !== self.layer {
-            layer.removeFromSuperlayer()
-            self.layer.addSublayer(layer)
-        }
-        setNeedsLayout()
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        setup()
     }
 
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        hostedLayer?.frame = bounds
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        setup()
+    }
+
+    func update(subtitle: String, transcript: String) {
+        subtitleLabel.text = subtitle.isEmpty ? "รอคำแปลจาก Screen Broadcast…" : subtitle
+        transcriptLabel.text = transcript.isEmpty ? "Screen Broadcast subtitle preview" : transcript
+    }
+
+    private func setup() {
+        backgroundColor = .clear
+        layer.cornerRadius = 28
+        layer.masksToBounds = true
+
+        let blur = UIVisualEffectView(effect: UIBlurEffect(style: .systemUltraThinMaterialDark))
+        blur.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(blur)
+
+        let stack = UIStackView(arrangedSubviews: [badgeLabel, subtitleLabel, transcriptLabel])
+        stack.axis = .vertical
+        stack.alignment = .fill
+        stack.spacing = 6
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(stack)
+
+        badgeLabel.text = "SCREEN BROADCAST • SYSTEM PiP"
+        badgeLabel.textColor = UIColor.systemGreen
+        badgeLabel.font = UIFont.systemFont(ofSize: 13, weight: .bold)
+        badgeLabel.textAlignment = .center
+
+        subtitleLabel.textColor = .white
+        subtitleLabel.font = UIFont.systemFont(ofSize: 30, weight: .bold)
+        subtitleLabel.adjustsFontSizeToFitWidth = true
+        subtitleLabel.minimumScaleFactor = 0.55
+        subtitleLabel.numberOfLines = 2
+        subtitleLabel.textAlignment = .center
+
+        transcriptLabel.textColor = UIColor.white.withAlphaComponent(0.72)
+        transcriptLabel.font = UIFont.systemFont(ofSize: 14, weight: .medium)
+        transcriptLabel.numberOfLines = 1
+        transcriptLabel.textAlignment = .center
+
+        NSLayoutConstraint.activate([
+            blur.leadingAnchor.constraint(equalTo: leadingAnchor),
+            blur.trailingAnchor.constraint(equalTo: trailingAnchor),
+            blur.topAnchor.constraint(equalTo: topAnchor),
+            blur.bottomAnchor.constraint(equalTo: bottomAnchor),
+
+            stack.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 18),
+            stack.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -18),
+            stack.centerYAnchor.constraint(equalTo: centerYAnchor),
+            stack.topAnchor.constraint(greaterThanOrEqualTo: topAnchor, constant: 12),
+            stack.bottomAnchor.constraint(lessThanOrEqualTo: bottomAnchor, constant: -12)
+        ])
     }
 }

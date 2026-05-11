@@ -2,7 +2,7 @@
 
 โปรเจกต์นี้เพิ่มต้นแบบ **iOS local realtime screen-broadcast subtitle translator** สำหรับกรณี “เปิด Screen Recording/Broadcast แล้วแปลเสียง/ซับจากหน้าจอเป็น PiP subtitle” พร้อม workflow บน GitHub Actions macOS เพื่อ build ไฟล์ `.ipa` แบบ unsigned
 
-> หมายเหตุสำคัญ: โหมดหลักของแอปนี้คือ Screen Recording/Broadcast ไม่ใช่การอัดเสียงล้วน ๆ เพราะ iOS ไม่อนุญาตให้แอปทั่วไปดัก system audio เองแบบเงียบ ๆ วิธีที่ถูกต้องคือให้ผู้ใช้เริ่ม ReplayKit Broadcast ผ่าน UI ของ iOS แล้วระบบส่งเฟรมหน้าจอและเสียงของแอปที่ broadcast ให้ extension ส่วน PiP จริงต้องอิง video layer; ต้นแบบนี้จึง render ซับเป็น sample-buffer video แล้วเปิด System PiP ที่ลากขยับได้
+> หมายเหตุสำคัญ: โหมดหลักของแอปนี้คือ Screen Recording/Broadcast ไม่ใช่การอัดเสียงล้วน ๆ เพราะ iOS ไม่อนุญาตให้แอปทั่วไปดัก system audio เองแบบเงียบ ๆ วิธีที่ถูกต้องคือให้ผู้ใช้เริ่ม ReplayKit Broadcast ผ่าน UI ของ iOS แล้วระบบส่งเฟรมหน้าจอและเสียงของแอปที่ broadcast ให้ extension ส่วน PiP จริงต้องอิง video/call content source; ต้นแบบนี้จึง render ซับเป็น UIView content ใน System PiP ที่ลากขยับได้
 
 ## มีอะไรใน repo นี้
 
@@ -27,7 +27,7 @@
 - ปุ่ม `Demo subtitle` สำหรับจำลองซับเกม/วิดีโอในเครื่อง
 - โหมดเริ่มต้นคือ `Screen Recording` พร้อม `RPSystemBroadcastPickerView` เพื่อให้ผู้ใช้เริ่ม Broadcast ผ่าน UI ทางการของ iOS
 - Broadcast Upload Extension target ที่รับ `audioApp`, `audioMic`, `video` sample buffers แล้วเขียน subtitle payload ผ่าน App Group
-- PiP subtitle renderer scaffold ที่ render ข้อความแปลลงใน sample-buffer video stream สำหรับ `AVPictureInPictureController`
+- PiP subtitle renderer ที่ใช้ `AVPictureInPictureVideoCallViewController`/System PiP host view เพื่อให้หน้าต่าง PiP มีคอนเทนต์จริง ไม่จอดำ และลาก/ย่อ/ขยายได้โดย iOS
 
 
 ## แนวทางเทียบกับแอปแนว ViiTor
@@ -59,11 +59,16 @@
 
 ### 2) ทำซับลอยด้วย Picture-in-Picture
 
-แอปหลักเพิ่ม `PiPSubtitleController` เพื่อ render ข้อความคำแปลเป็นภาพใน `AVSampleBufferDisplayLayer`, attach layer เข้ากับ preview view ในแอป แล้วเปิด `AVPictureInPictureController.ContentSource` แบบ sample-buffer video layer เมื่อ PiP เริ่มแล้ว iOS เป็นเจ้าของหน้าต่าง PiP ผู้ใช้จึงลาก/ขยับ/ย่อ/ขยายได้เหมือน YouTube PiP ไม่ใช่การสร้าง overlay เหนือแอปอื่นแบบ Android
+แอปหลักเพิ่ม `PiPSubtitleController` ที่ attach preview view เข้ากับหน้าจอก่อน แล้วเปิด `AVPictureInPictureController.ContentSource(activeVideoCallSourceView:contentViewController:)` ผ่าน `AVPictureInPictureVideoCallViewController` วิธีนี้ทำให้ PiP มี UIView subtitle content จริง จึงลดปัญหาจอดำจาก sample-buffer layer เปล่า และเมื่อ PiP เริ่มแล้ว iOS เป็นเจ้าของหน้าต่าง ผู้ใช้จึงลาก/ขยับ/ย่อ/ขยายได้เหมือน YouTube PiP
 
 ### 3) Privacy/App Store
 
 โครงนี้ตั้งใจใช้เฉพาะ API ทางการ: Speech, Microphone, ReplayKit Broadcast, App Group และ PiP ผู้ใช้ต้องเห็นและอนุญาตการ broadcast เองเสมอ การเปิดใช้ App Group บนเครื่องจริงต้องตั้งค่า entitlement/group identifier ให้ตรงกับบัญชี Apple Developer ของคุณ
+
+
+### แก้กรณี PiP จอดำ/เด้ง
+
+ถ้าเห็นหน้าจอ PiP สีดำหรือแอปเด้ง มักเกิดจากการเริ่ม PiP ก่อนที่ source view จะถูก attach เข้าหน้าจอ หรือใช้ sample-buffer layer ที่ยังไม่มีเฟรมต่อเนื่อง เวอร์ชันนี้เปลี่ยน PiP เป็น video-call content source ที่มี UIView subtitle จริง, แสดง preview ในแอปก่อนเริ่ม PiP, และถ้า PiP ยังไม่พร้อมจะแสดงข้อความสถานะแทนการ force start
 
 ## Build unsigned IPA บน GitHub
 
@@ -109,7 +114,7 @@ script จะรัน `xcodebuild` ด้วย:
 
 - iOS ไม่มี permission ให้แอปทั่วไปวาด overlay เหนือแอปอื่นเหมือน Android
 - PiP จริงต้องผูกกับ video playback/call UI ที่เป็นไปตาม API ของ Apple
-- repo นี้เพิ่ม `PiPSubtitleController` ที่ attach sample-buffer video layer เข้ากับ preview view และเปิด System PiP จริง เมื่อรันบนอุปกรณ์ที่รองรับ ผู้ใช้จะลาก/ขยับหน้าต่างได้แบบ YouTube PiP
+- repo นี้เพิ่ม `PiPSubtitleController` ที่ attach UIView preview เข้ากับหน้าจอก่อนเปิด System PiP จริง พร้อม guard/ข้อความ error ถ้า PiP ยังไม่พร้อม เมื่อรันบนอุปกรณ์ที่รองรับ ผู้ใช้จะลาก/ขยับหน้าต่างได้แบบ YouTube PiP
 
 ### Local translation model
 
