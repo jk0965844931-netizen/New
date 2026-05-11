@@ -9,6 +9,7 @@ final class PiPSubtitleController: NSObject, ObservableObject {
     @Published private(set) var statusMessage = "Safe movable subtitles are ready. System PiP is optional."
     @Published var showsSafeMovableOverlay = false
     @Published var allowsExperimentalSystemPiP = false
+    @Published private(set) var statusMessage = "Attach the PiP preview, then start System PiP."
 
     fileprivate let sourceView = SubtitlePiPSourceView()
     private var pictureInPictureController: AVPictureInPictureController?
