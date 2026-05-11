@@ -1,4 +1,4 @@
-const CACHE_NAME = 'manga-overlay-translator-v1';
+const CACHE_NAME = 'manga-overlay-translator-v2';
 const APP_SHELL = ['.', './index.html', './src/main.js', './src/styles.css', './manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
