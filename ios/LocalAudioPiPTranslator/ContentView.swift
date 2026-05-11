@@ -26,10 +26,18 @@ struct ContentView: View {
                     .environmentObject(audioSession)
                     .padding()
             }
+
+            if pipSubtitleController.showsSafeMovableOverlay {
+                DraggableSubtitleOverlay(
+                    translatedText: audioSession.translatedText,
+                    transcript: audioSession.partialTranscript,
+                    onClose: { pipSubtitleController.hideSafeMovableOverlay() }
+                )
+                .padding()
+            }
         }
         .onChange(of: audioSession.translatedText) { newValue in
             pipSubtitleController.updateSubtitle(newValue, transcript: audioSession.partialTranscript)
-            pipSubtitleController.updateSubtitle(newValue)
         }
     }
 
@@ -170,13 +178,20 @@ struct ContentView: View {
             }
 
             HStack {
-                Button("Start movable PiP") {
+                Button("Show safe movable subtitles") {
                     pipSubtitleController.updateSubtitle(audioSession.translatedText, transcript: audioSession.partialTranscript)
-                    pipSubtitleController.startPictureInPicture()
+                    pipSubtitleController.showSafeMovableOverlay()
                 }
                 .buttonStyle(.borderedProminent)
 
-                Button("Stop PiP") {
+                Button("Try System PiP") {
+                    pipSubtitleController.allowsExperimentalSystemPiP = true
+                    pipSubtitleController.updateSubtitle(audioSession.translatedText, transcript: audioSession.partialTranscript)
+                    pipSubtitleController.startPictureInPicture()
+                }
+                .buttonStyle(.bordered)
+
+                Button("Stop") {
                     pipSubtitleController.stopPictureInPicture()
                 }
                 .buttonStyle(.bordered)
@@ -188,6 +203,8 @@ struct ContentView: View {
             Text(pipSubtitleController.statusMessage)
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            Toggle("Experimental System PiP (may black-screen on some unsigned builds)", isOn: $pipSubtitleController.allowsExperimentalSystemPiP)
+                .font(.caption)
             Text(pipSubtitleController.systemPiPDescription)
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -276,6 +293,57 @@ struct ContentView: View {
         }
         .padding()
         .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+    }
+}
+
+struct DraggableSubtitleOverlay: View {
+    let translatedText: String
+    let transcript: String
+    let onClose: () -> Void
+
+    @State private var offset = CGSize(width: 0, height: -120)
+    @State private var dragStart = CGSize.zero
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Circle().fill(.green).frame(width: 9, height: 9)
+                Text("SAFE MOVABLE SUBTITLES")
+                    .font(.caption.bold())
+                Spacer()
+                Button("×", action: onClose)
+                    .font(.headline.bold())
+                    .foregroundStyle(.white)
+                    .buttonStyle(.plain)
+            }
+            Text(translatedText.isEmpty ? "รอคำแปลจาก Screen Broadcast…" : translatedText)
+                .font(.title3.bold())
+                .lineLimit(3)
+            Text(transcript.isEmpty ? "ลากกล่องนี้ไปตำแหน่งที่ต้องการได้" : transcript)
+                .font(.caption)
+                .foregroundStyle(.white.opacity(0.72))
+                .lineLimit(2)
+        }
+        .padding(14)
+        .foregroundStyle(.white)
+        .background(.black.opacity(0.82), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(Color.white.opacity(0.18))
+        )
+        .shadow(radius: 20)
+        .frame(maxWidth: 430)
+        .offset(offset)
+        .gesture(
+            DragGesture()
+                .onChanged { value in
+                    offset = CGSize(width: dragStart.width + value.translation.width, height: dragStart.height + value.translation.height)
+                }
+                .onEnded { _ in
+                    dragStart = offset
+                }
+        )
+        .transition(.scale.combined(with: .opacity))
     }
 }
 

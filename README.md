@@ -27,6 +27,7 @@
 - ปุ่ม `Demo subtitle` สำหรับจำลองซับเกม/วิดีโอในเครื่อง
 - โหมดเริ่มต้นคือ `Screen Recording` พร้อม `RPSystemBroadcastPickerView` เพื่อให้ผู้ใช้เริ่ม Broadcast ผ่าน UI ทางการของ iOS
 - Broadcast Upload Extension target ที่รับ `audioApp`, `audioMic`, `video` sample buffers แล้วเขียน subtitle payload ผ่าน App Group
+- Safe movable subtitle overlay ที่ลากได้ทันทีโดยไม่เด้ง และมี Experimental System PiP แยกไว้สำหรับทดสอบบนเครื่องที่รองรับ
 - PiP subtitle renderer ที่ใช้ `AVPictureInPictureVideoCallViewController`/System PiP host view เพื่อให้หน้าต่าง PiP มีคอนเทนต์จริง ไม่จอดำ และลาก/ย่อ/ขยายได้โดย iOS
 
 
@@ -59,6 +60,7 @@
 
 ### 2) ทำซับลอยด้วย Picture-in-Picture
 
+แอปหลักเพิ่ม `PiPSubtitleController` และ safe movable subtitle overlay: ปุ่มหลักจะเปิดกล่องซับที่ลากได้ทันทีในแอปโดยไม่ force-start System PiP จึงไม่ควรจอดำหรือเด้ง ส่วน `Experimental System PiP` ยังใช้ `AVPictureInPictureController.ContentSource(activeVideoCallSourceView:contentViewController:)` ผ่าน `AVPictureInPictureVideoCallViewController` สำหรับทดสอบบนเครื่อง/โปรไฟล์ที่รองรับ
 แอปหลักเพิ่ม `PiPSubtitleController` ที่ attach preview view เข้ากับหน้าจอก่อน แล้วเปิด `AVPictureInPictureController.ContentSource(activeVideoCallSourceView:contentViewController:)` ผ่าน `AVPictureInPictureVideoCallViewController` วิธีนี้ทำให้ PiP มี UIView subtitle content จริง จึงลดปัญหาจอดำจาก sample-buffer layer เปล่า และเมื่อ PiP เริ่มแล้ว iOS เป็นเจ้าของหน้าต่าง ผู้ใช้จึงลาก/ขยับ/ย่อ/ขยายได้เหมือน YouTube PiP
 
 ### 3) Privacy/App Store
@@ -68,6 +70,7 @@
 
 ### แก้กรณี PiP จอดำ/เด้ง
 
+ถ้าเห็นหน้าจอ PiP สีดำหรือแอปเด้ง ให้ใช้ปุ่ม **Show safe movable subtitles** เป็นค่าเริ่มต้น ปุ่มนี้ไม่เรียก System PiP เลย แต่เปิดกล่องซับที่ลากได้ในแอปทันที ส่วน **Try System PiP** เป็นโหมดทดลองที่อาจขึ้นกับเครื่อง, iOS, provisioning และ background modes; ถ้าเริ่มไม่ได้แอปจะ fallback กลับมาแสดง safe movable subtitles แทน
 ถ้าเห็นหน้าจอ PiP สีดำหรือแอปเด้ง มักเกิดจากการเริ่ม PiP ก่อนที่ source view จะถูก attach เข้าหน้าจอ หรือใช้ sample-buffer layer ที่ยังไม่มีเฟรมต่อเนื่อง เวอร์ชันนี้เปลี่ยน PiP เป็น video-call content source ที่มี UIView subtitle จริง, แสดง preview ในแอปก่อนเริ่ม PiP, และถ้า PiP ยังไม่พร้อมจะแสดงข้อความสถานะแทนการ force start
 
 ## Build unsigned IPA บน GitHub

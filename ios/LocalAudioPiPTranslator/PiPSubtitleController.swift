@@ -6,6 +6,9 @@ import UIKit
 final class PiPSubtitleController: NSObject, ObservableObject {
     @Published private(set) var isPictureInPicturePossible = false
     @Published private(set) var isPictureInPictureActive = false
+    @Published private(set) var statusMessage = "Safe movable subtitles are ready. System PiP is optional."
+    @Published var showsSafeMovableOverlay = false
+    @Published var allowsExperimentalSystemPiP = false
     @Published private(set) var statusMessage = "Attach the PiP preview, then start System PiP."
 
     fileprivate let sourceView = SubtitlePiPSourceView()
@@ -20,7 +23,17 @@ final class PiPSubtitleController: NSObject, ObservableObject {
     }
 
     var systemPiPDescription: String {
-        "This uses the system AVPictureInPictureController video-call content source. After it starts, iOS owns the floating window, so it can be dragged or collapsed like YouTube PiP."
+        "Safe mode shows a draggable subtitle window without starting System PiP, so it avoids the black-screen/crash path. Enable experimental System PiP only after the preview is visible."
+    }
+
+    func showSafeMovableOverlay() {
+        showsSafeMovableOverlay = true
+        statusMessage = "Safe movable subtitles are visible. Drag the subtitle card inside the app; System PiP was not force-started."
+    }
+
+    func hideSafeMovableOverlay() {
+        showsSafeMovableOverlay = false
+        statusMessage = "Safe movable subtitles hidden."
     }
 
     func updateSubtitle(_ text: String, transcript: String = "") {
@@ -52,19 +65,28 @@ final class PiPSubtitleController: NSObject, ObservableObject {
     }
 
     func startPictureInPicture() {
+        guard allowsExperimentalSystemPiP else {
+            showSafeMovableOverlay()
+            statusMessage = "System PiP is disabled in safe mode because this device showed a black screen/crash. Turn on Experimental System PiP to try it."
+            return
+        }
+
         configurePictureInPictureIfPossible()
 
         guard sourceView.window != nil else {
-            statusMessage = "PiP preview is not attached yet. Wait for the preview card to appear, then tap Start movable PiP again."
+            showSafeMovableOverlay()
+            statusMessage = "PiP preview is not attached yet, so safe movable subtitles were shown instead."
             return
         }
         guard let pictureInPictureController else {
-            statusMessage = "System PiP is unavailable on this device or iOS version."
+            showSafeMovableOverlay()
+            statusMessage = "System PiP is unavailable; safe movable subtitles were shown instead."
             return
         }
         guard pictureInPictureController.isPictureInPicturePossible else {
             isPictureInPicturePossible = false
-            statusMessage = "System PiP is not possible yet. Keep the preview visible and try again."
+            showSafeMovableOverlay()
+            statusMessage = "System PiP is not possible yet; safe movable subtitles were shown instead."
             return
         }
 
@@ -74,6 +96,7 @@ final class PiPSubtitleController: NSObject, ObservableObject {
 
     func stopPictureInPicture() {
         pictureInPictureController?.stopPictureInPicture()
+        hideSafeMovableOverlay()
     }
 
     private func configurePictureInPictureIfPossible() {
@@ -133,7 +156,8 @@ extension PiPSubtitleController: AVPictureInPictureControllerDelegate {
     nonisolated func pictureInPictureController(_ pictureInPictureController: AVPictureInPictureController, failedToStartPictureInPictureWithError error: Error) {
         Task { @MainActor in
             isPictureInPictureActive = false
-            statusMessage = "PiP failed to start: \(error.localizedDescription)"
+            showsSafeMovableOverlay = true
+            statusMessage = "PiP failed to start, so safe movable subtitles were shown: \(error.localizedDescription)"
         }
     }
 
