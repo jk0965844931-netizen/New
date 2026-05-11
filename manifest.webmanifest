@@ -1,0 +1,10 @@
+{
+  "name": "Manga Overlay Translator",
+  "short_name": "Manga TL",
+  "description": "Mobile-first manga reader with fast translation overlays.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#080b12",
+  "theme_color": "#111827",
+  "icons": []
+}
